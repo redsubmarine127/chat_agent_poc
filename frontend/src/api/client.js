@@ -82,6 +82,17 @@ export function invokeMcpTool(toolName, argumentsPayload = {}) {
   });
 }
 
+export function runAgentEvaluation(payload = {}) {
+  return request('/api/evaluations/runs', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export function evaluationReportDownloadUrl(downloadUrl) {
+  return `${API_BASE_URL}${downloadUrl}`;
+}
+
 export function downloadMarkdownFile(content, filename) {
   submitDownloadForm('/api/exports/markdown', { content, filename });
 }

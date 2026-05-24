@@ -3,6 +3,8 @@ package com.example.assistant.application.chat;
 import com.example.assistant.application.skill.SkillService;
 import com.example.assistant.application.model.ModelService;
 import com.example.assistant.application.mcp.McpToolService;
+import com.example.assistant.application.observability.ChatObservability;
+import com.example.assistant.application.observability.ChatTrace;
 import com.example.assistant.application.rag.RagRetrievalService;
 import com.example.assistant.domain.chat.Conversation;
 import com.example.assistant.domain.model.AiModel;
@@ -48,6 +50,10 @@ class ChatStreamServiceTest {
     private McpToolService mcpToolService;
     @Mock
     private TransactionalOperator transactionalOperator;
+    @Mock
+    private ChatObservability chatObservability;
+    @Mock
+    private ChatTrace chatTrace;
 
     private ChatStreamService chatStreamService;
 
@@ -61,11 +67,13 @@ class ChatStreamServiceTest {
                 chatModelGateway,
                 ragRetrievalService,
                 mcpToolService,
-                transactionalOperator
+                transactionalOperator,
+                chatObservability
         );
         when(transactionalOperator.transactional(any(Mono.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(ragRetrievalService.retrieve(any(String.class), anyInt())).thenReturn(Flux.empty());
         when(mcpToolService.listTools()).thenReturn(Flux.empty());
+        when(chatObservability.startChatTrace(any())).thenReturn(chatTrace);
     }
 
     @Test

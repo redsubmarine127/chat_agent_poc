@@ -60,6 +60,10 @@
 - The product MUST include automated Agent evaluation datasets.
 - The product MUST include an automated runner that can score backend responses.
 - Evaluation SHOULD cover streaming, reasoning, Markdown, tables, exports, latency, and error handling.
+- Evaluation SHOULD keep `agent-evals/` as the project-native adapter for real backend APIs.
+- Evaluation SHOULD use DeepEval for semantic Agent quality scoring when deterministic checks are insufficient.
+- The product SHOULD retain Langfuse as the optional production trace, feedback, and evaluation dataset source.
+- The frontend SHOULD provide an Agent evaluation entry that can run an evaluation plan, show summary and case-level results, and download generated JSON and Markdown reports.
 
 ## RAG And MCP
 

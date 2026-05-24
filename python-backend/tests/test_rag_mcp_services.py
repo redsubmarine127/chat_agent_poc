@@ -1,6 +1,6 @@
 import pytest
 
-from app.config import McpConfig, McpToolConfig, ModelConfig, RagConfig, RagDocumentConfig, Settings
+from app.config import LangfuseConfig, McpConfig, McpToolConfig, ModelConfig, RagConfig, RagDocumentConfig, Settings
 from app.services.mcp_service import McpService
 from app.services.rag_service import RagService
 
@@ -25,6 +25,7 @@ def build_settings() -> Settings:
             ),
         ),
         mcp=McpConfig(True, (McpToolConfig("context.search", "搜索 RAG 上下文"),)),
+        langfuse=LangfuseConfig(False, "https://cloud.langfuse.com", "", "", "test"),
     )
 
 

@@ -5,10 +5,11 @@ from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
-from app.models import CreateConversationRequest, ExtractSkillRequest, McpInvokeRequest, McpToolResultResponse, McpToolResponse, RagContextResponse, StreamChatRequest
+from app.models import CreateConversationRequest, EvaluationRunRequest, ExtractSkillRequest, McpInvokeRequest, McpToolResultResponse, McpToolResponse, RagContextResponse, StreamChatRequest
 from app.services.chat_service import ChatStreamService, ConversationService
+from app.services.evaluation_service import EvaluationRunOptions, EvaluationService
 from app.services.export_service import ExportService
 from app.services.file_service import FileService
 from app.services.mcp_service import McpService
@@ -49,6 +50,10 @@ def rag_service(request: Request) -> RagService:
 
 def mcp_service(request: Request) -> McpService:
     return request.app.state.mcp_service
+
+
+def evaluation_service(request: Request) -> EvaluationService:
+    return request.app.state.evaluation_service
 
 
 @router.get("/conversations")
@@ -138,6 +143,28 @@ async def invoke_mcp_tool(
         content=result.content,
         metadata=result.metadata,
     )
+
+
+@router.post("/evaluations/runs")
+async def run_evaluation(
+    request: EvaluationRunRequest,
+    service: Annotated[EvaluationService, Depends(evaluation_service)],
+):
+    return await service.run(
+        EvaluationRunOptions(
+            dataset=request.dataset,
+            model_id=request.modelId,
+            semantic_evaluator=request.semanticEvaluator,
+            fail_under=request.failUnder,
+        )
+    )
+
+
+@router.get("/evaluations/reports/{filename}/download")
+async def download_evaluation_report(filename: str, service: Annotated[EvaluationService, Depends(evaluation_service)]):
+    report_path = service.resolve_report_path(filename)
+    media_type = "application/json" if report_path.suffix == ".json" else "text/markdown; charset=utf-8"
+    return FileResponse(report_path, media_type=media_type, filename=report_path.name)
 
 
 @router.post("/files")

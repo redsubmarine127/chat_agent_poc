@@ -38,6 +38,14 @@
 - The frontend SHOULD use same-origin proxy or direct `VITE_API_BASE_URL` consistently.
 - Downloaded Markdown MUST contain the visible assistant content.
 - Downloaded Excel MUST contain parsed Markdown tables when present.
+- Agent evaluation reports MUST expose downloadable JSON and Markdown files after an evaluation run completes.
+
+## Agent Evaluation
+
+- The sidebar SHOULD provide an Agent evaluation entry under conversation tools.
+- The evaluation panel SHOULD allow selecting dataset, optional model override, semantic evaluator mode, and pass threshold.
+- Running an evaluation MUST call the backend evaluation API and display average score, pass count, error count, case-level status, and raw command output.
+- Evaluation report downloads MUST use backend-generated report files rather than reconstructing content in the browser.
 
 ## Visual Quality
 
@@ -45,4 +53,3 @@
 - The UI MUST avoid overlapping text and controls.
 - Text MUST fit within buttons, cards, sidebars, and message bubbles across common desktop and mobile widths.
 - Cards MUST be used only where they frame discrete items, modals, or tools.
-

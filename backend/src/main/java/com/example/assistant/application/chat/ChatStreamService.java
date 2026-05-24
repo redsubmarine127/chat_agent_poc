@@ -2,6 +2,9 @@ package com.example.assistant.application.chat;
 
 import com.example.assistant.application.model.ModelService;
 import com.example.assistant.application.mcp.McpToolService;
+import com.example.assistant.application.observability.ChatObservability;
+import com.example.assistant.application.observability.ChatTrace;
+import com.example.assistant.application.observability.ChatTraceContext;
 import com.example.assistant.application.rag.RagRetrievalService;
 import com.example.assistant.application.skill.SkillService;
 import com.example.assistant.domain.chat.ChatMessage;
@@ -18,6 +21,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -34,6 +38,7 @@ public class ChatStreamService {
     private final RagRetrievalService ragRetrievalService;
     private final McpToolService mcpToolService;
     private final TransactionalOperator transactionalOperator;
+    private final ChatObservability chatObservability;
 
     public ChatStreamService(
             ConversationService conversationService,
@@ -43,7 +48,8 @@ public class ChatStreamService {
             ChatModelGateway chatModelGateway,
             RagRetrievalService ragRetrievalService,
             McpToolService mcpToolService,
-            TransactionalOperator transactionalOperator
+            TransactionalOperator transactionalOperator,
+            ChatObservability chatObservability
     ) {
         this.conversationService = conversationService;
         this.skillService = skillService;
@@ -53,6 +59,7 @@ public class ChatStreamService {
         this.ragRetrievalService = ragRetrievalService;
         this.mcpToolService = mcpToolService;
         this.transactionalOperator = transactionalOperator;
+        this.chatObservability = chatObservability;
     }
 
     public Flux<ChatStreamEvent> stream(UUID conversationId, String content, String skillId, String modelId, List<UUID> attachmentIds) {
@@ -66,6 +73,14 @@ public class ChatStreamService {
                 ? List.of()
                 : attachmentIds.stream().filter(Objects::nonNull).toList();
         StringBuffer assistantContentBuffer = new StringBuffer(1024);
+        ChatTrace trace = chatObservability.startChatTrace(new ChatTraceContext(
+                conversationId,
+                assistantMessageId,
+                "java",
+                modelId,
+                skillId,
+                userContent
+        ));
         Mono<ChatModelGateway.ChatPrompt> promptMono = Mono.zip(
                         conversationService.findConversation(conversationId),
                         skillService.getEnabledSkill(skillId),
@@ -77,6 +92,11 @@ public class ChatStreamService {
                         mcpToolService.listTools().collectList()
                 )
                 .flatMap(tuple -> {
+                    safeTraceEvent(trace, "context.loaded", Map.of(
+                            "historyCount", tuple.getT4().size(),
+                            "ragContextIds", tuple.getT5().stream().map(context -> context.sourceId()).toList(),
+                            "mcpToolNames", tuple.getT6().stream().map(tool -> tool.name()).toList()
+                    ));
                     ChatMessage userMessage = ChatMessage.user(conversationId, userContent, skillId, safeAttachmentIds);
                     return chatMessageRepository.save(ChatMessageEntity.newFromDomain(userMessage))
                             .thenReturn(new ChatModelGateway.ChatPrompt(
@@ -98,6 +118,7 @@ public class ChatStreamService {
                     skillId,
                     MessageStatus.COMPLETED
             ).thenReturn(ChatStreamEvent.completed(assistantMessageId))
+                    .doOnSuccess(ignored -> safeTraceComplete(trace, assistantContentBuffer.toString()))
         ).as(transactionalOperator::transactional);
 
         return promptMono.flatMapMany(prompt -> {
@@ -136,6 +157,11 @@ public class ChatStreamService {
                                 );
                                 return Mono.empty();
                             })
+                            .doOnSuccess(ignored -> safeTraceFail(
+                                    trace,
+                                    assistantContentBuffer.toString(),
+                                    ErrorCode.CHAT_STREAM_FAILED.message()
+                            ))
                             .thenReturn(ChatStreamEvent.failed(assistantMessageId, ErrorCode.CHAT_STREAM_FAILED.message()));
                 });
     }
@@ -158,5 +184,29 @@ public class ChatStreamService {
                 Instant.now()
         );
         return chatMessageRepository.save(ChatMessageEntity.newFromDomain(assistantMessage));
+    }
+
+    private void safeTraceEvent(ChatTrace trace, String name, Map<String, Object> metadata) {
+        try {
+            trace.event(name, metadata);
+        } catch (RuntimeException exception) {
+            LOGGER.debug("chat trace event failed, name={}", name, exception);
+        }
+    }
+
+    private void safeTraceComplete(ChatTrace trace, String output) {
+        try {
+            trace.complete(output);
+        } catch (RuntimeException exception) {
+            LOGGER.debug("chat trace complete failed", exception);
+        }
+    }
+
+    private void safeTraceFail(ChatTrace trace, String output, String errorMessage) {
+        try {
+            trace.fail(output, errorMessage);
+        } catch (RuntimeException exception) {
+            LOGGER.debug("chat trace fail failed", exception);
+        }
     }
 }

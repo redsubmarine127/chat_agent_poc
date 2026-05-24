@@ -71,10 +71,14 @@
           "reasoning": true,
           "completedEvent": true
         },
+        "semantic": {
+          "name": "Agent risk review quality",
+          "criteria": "回答需要面向生产级 Agent 后端风险审查，覆盖文件上传、模型流式输出、异常处理、日志、安全、资源控制等方面，并给出可执行的缓解措施。",
+          "threshold": 0.75
+        },
         "maxFirstTokenMs": 15000,
         "maxTotalMs": 90000
       }
     }
   ]
 }
-

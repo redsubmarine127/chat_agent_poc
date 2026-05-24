@@ -82,3 +82,19 @@ flowchart TD
 ```bash
 pytest
 ```
+
+## Langfuse 观测
+
+Langfuse 是可选能力，默认开启。未配置凭据时会自动降级为 Noop，不影响对话链路。需要生产 Trace 时安装可选依赖并配置环境变量：
+
+```bash
+pip install -e ".[observability]"
+
+export LANGFUSE_ENABLED=true
+export LANGFUSE_HOST=https://cloud.langfuse.com
+export LANGFUSE_PUBLIC_KEY=your-public-key
+export LANGFUSE_SECRET_KEY=your-secret-key
+export LANGFUSE_ENVIRONMENT=local
+```
+
+开启后，Python LangGraph 后端会为每次流式对话记录 `conversationId`、`messageId`、`modelId`、`skillId`、RAG context、MCP tool、终态和输出摘要。Langfuse 初始化失败时会自动降级为 Noop，不影响对话链路。

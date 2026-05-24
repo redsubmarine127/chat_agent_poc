@@ -14,9 +14,11 @@ from app.config import get_settings
 from app.database import Database
 from app.errors import AssistantError
 from app.models import ErrorResponse
+from app.observability import build_observability
 from app.repositories import AttachmentRepository, ConversationRepository, DynamicSkillRepository, MessageRepository
 from app.services.chat_service import ChatStreamService, ConversationService
 from app.services.export_service import ExportService
+from app.services.evaluation_service import EvaluationService
 from app.services.file_service import FileService
 from app.services.mcp_service import McpService
 from app.services.model_service import ModelService
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
     conversation_service = ConversationService(conversation_repository, message_repository)
     rag_service = RagService(settings)
     mcp_service = McpService(settings, rag_service)
+    observability = build_observability(settings)
 
     app.state.settings = settings
     app.state.database = database
@@ -52,6 +55,7 @@ async def lifespan(app: FastAPI):
     app.state.conversation_service = conversation_service
     app.state.rag_service = rag_service
     app.state.mcp_service = mcp_service
+    app.state.observability = observability
     app.state.chat_stream_service = ChatStreamService(
         conversation_repository,
         message_repository,
@@ -60,9 +64,11 @@ async def lifespan(app: FastAPI):
         RoutingChatModelGateway(),
         rag_service,
         mcp_service,
+        observability,
     )
     app.state.file_service = FileService(settings, attachment_repository)
     app.state.export_service = ExportService()
+    app.state.evaluation_service = EvaluationService(f"http://127.0.0.1:{settings.server_port}")
 
     try:
         yield

@@ -111,6 +111,33 @@ class McpToolResultResponse(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class EvaluationRunRequest(BaseModel):
+    dataset: str = Field(default="smoke_langgraph", pattern="^[a-zA-Z0-9_.-]+$")
+    modelId: str = Field(default="", max_length=96)
+    semanticEvaluator: Literal["none", "auto", "deepeval"] = "none"
+    failUnder: float = Field(default=0.0, ge=0.0, le=100.0)
+
+
+class EvaluationReportFile(BaseModel):
+    type: Literal["json", "markdown"]
+    filename: str
+    downloadUrl: str
+
+
+class EvaluationRunResponse(BaseModel):
+    dataset: str
+    status: Literal["PASS", "NEEDS_REVIEW", "ERROR"]
+    exitCode: int
+    averageScore: float
+    passCount: int
+    errorCount: int
+    caseCount: int
+    durationMs: float
+    output: str
+    report: dict[str, Any]
+    files: list[EvaluationReportFile]
+
+
 class ErrorResponse(BaseModel):
     code: str
     message: str

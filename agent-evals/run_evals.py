@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib import error, parse, request
 
+from evaluators import evaluate_semantic_quality
+
 
 TABLE_PATTERN = re.compile(r"^\s*\|.+\|\s*$\n^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$", re.MULTILINE)
 CODE_BLOCK_PATTERN = re.compile(r"```[\s\S]+?```")
@@ -35,6 +37,7 @@ def main() -> int:
             skill_override=args.skill_id,
             timeout=args.timeout,
             keep_conversations=args.keep_conversations,
+            semantic_evaluator=args.semantic_evaluator,
         )
         results.append(result)
         print(f"{result['caseId']}: {result['score']['total']:.1f}/100 {result['status']}")
@@ -75,6 +78,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=120.0, help="HTTP timeout seconds")
     parser.add_argument("--fail-under", type=float, default=0.0, help="Exit with code 2 when average score is below this value")
     parser.add_argument("--keep-conversations", action="store_true", help="Keep eval conversations instead of deleting them")
+    parser.add_argument(
+        "--semantic-evaluator",
+        choices=("none", "auto", "deepeval"),
+        default="auto",
+        help="Semantic quality evaluator. auto uses DeepEval only when the dataset case declares expected.semantic.",
+    )
     return parser.parse_args()
 
 
@@ -86,6 +95,7 @@ def run_case(
     skill_override: str,
     timeout: float,
     keep_conversations: bool,
+    semantic_evaluator: str,
 ) -> dict[str, Any]:
     case_id = case["id"]
     model_id = model_override or case.get("modelId") or dataset.get("defaultModelId") or "local-fallback"
@@ -115,12 +125,19 @@ def run_case(
             timeout=timeout,
         )
         export_results = run_exports(base_url, stream_result["answer"], expected.get("exports", []), timeout)
-        score = score_case(stream_result, export_results, expected)
+        semantic_result = evaluate_semantic_quality(
+            mode=semantic_evaluator,
+            prompt=case["prompt"],
+            answer=stream_result["answer"],
+            expected=expected,
+        ).as_dict()
+        score = score_case(stream_result, export_results, expected, semantic_result=semantic_result)
         status = "PASS" if score["total"] >= case.get("passScore", 75) else "NEEDS_REVIEW"
         error_message = ""
     except Exception as exc:  # noqa: BLE001 - eval runner must continue across cases
         stream_result = empty_stream_result()
         export_results = {}
+        semantic_result = {"enabled": False, "provider": "none", "score": None, "reason": "", "skipped": False, "error": ""}
         score = score_case(stream_result, export_results, expected, request_error=str(exc))
         status = "ERROR"
         error_message = str(exc)
@@ -145,6 +162,7 @@ def run_case(
         "events": stream_result["events"],
         "metrics": stream_result["metrics"],
         "exports": export_results,
+        "semantic": semantic_result,
         "checks": score["checks"],
         "score": score,
     }
@@ -283,6 +301,7 @@ def score_case(
     export_results: dict[str, Any],
     expected: dict[str, Any],
     request_error: str = "",
+    semantic_result: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     answer = stream_result["answer"]
     reasoning = stream_result["reasoning"]
@@ -310,6 +329,9 @@ def score_case(
     forbidden_hits = [word for word in forbidden if word.lower() in (answer + reasoning + request_error).lower()]
     checks["forbiddenClean"] = not forbidden_hits
     checks["exports"] = all(item.get("ok") for item in export_results.values()) if export_results else True
+    semantic_score = semantic_result.get("score") if semantic_result and semantic_result.get("enabled") else None
+    if semantic_score is not None:
+        checks["semanticQuality"] = semantic_score >= float(expected.get("semantic", {}).get("threshold", 0.7))
 
     completion = 0
     completion += 15 if checks["noFailedEvent"] and checks["noRequestError"] else 0
@@ -317,9 +339,12 @@ def score_case(
     completion += 10 if checks["completedEvent"] else 0
     completion += 5 if checks["startedEvent"] else 0
 
-    accuracy = 0
-    accuracy += 15 * (len(keyword_hits) / len(keywords)) if keywords else 15
-    accuracy += 5 if checks["forbiddenClean"] else 0
+    if semantic_score is not None:
+        accuracy = 20 * max(0.0, min(1.0, float(semantic_score)))
+    else:
+        accuracy = 0
+        accuracy += 15 * (len(keyword_hits) / len(keywords)) if keywords else 15
+        accuracy += 5 if checks["forbiddenClean"] else 0
 
     format_checks = ["reasoning", "table", "codeBlock", "orderedList", "exports"]
     active_format_checks = [
@@ -357,6 +382,7 @@ def score_case(
         "keywordHits": keyword_hits,
         "forbiddenHits": forbidden_hits,
         "requestError": request_error,
+        "semantic": semantic_result or {"enabled": False, "provider": "none"},
     }
 
 
@@ -421,6 +447,10 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         notes = []
         if item["score"].get("forbiddenHits"):
             notes.append("forbidden hit")
+        if item.get("semantic", {}).get("enabled"):
+            notes.append(f"semantic={item['semantic'].get('score')}")
+        if item.get("semantic", {}).get("skipped"):
+            notes.append("semantic skipped")
         if item["error"]:
             notes.append(item["error"][:80].replace("|", "/"))
         lines.append(
@@ -441,6 +471,7 @@ def render_markdown_report(report: dict[str, Any]) -> str:
                 "",
                 f"- Score: `{item['score']['total']}`",
                 f"- Dimensions: `{json.dumps(item['score']['dimensions'], ensure_ascii=False)}`",
+                f"- Semantic: `{json.dumps(item.get('semantic', {}), ensure_ascii=False)}`",
                 f"- Events: `{', '.join(item['events'])}`",
                 "",
                 "Answer preview:",

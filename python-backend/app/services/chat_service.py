@@ -9,6 +9,7 @@ from app.ai.gateway import RoutingChatModelGateway
 from app.ai.graph import build_chat_graph
 from app.errors import AssistantError
 from app.models import ChatStreamResponse, McpToolResponse, MessageRole, MessageStatus, RagContextResponse
+from app.observability import AssistantObservability, NoopObservability
 from app.repositories import ConversationRepository, MessageRepository
 from app.services.mcp_service import McpService
 from app.services.model_service import ModelService
@@ -52,6 +53,7 @@ class ChatStreamService:
         gateway: RoutingChatModelGateway,
         rag_service: RagService,
         mcp_service: McpService,
+        observability: AssistantObservability | None = None,
     ) -> None:
         self._conversation_repository = conversation_repository
         self._message_repository = message_repository
@@ -60,6 +62,7 @@ class ChatStreamService:
         self._gateway = gateway
         self._rag_service = rag_service
         self._mcp_service = mcp_service
+        self._observability = observability or NoopObservability()
         self._graph = build_chat_graph()
 
     async def stream(
@@ -81,6 +84,13 @@ class ChatStreamService:
         await self._conversation_repository.touch(conversation_id)
 
         assistant_message_id = uuid4()
+        trace = self._observability.start_chat_trace(
+            conversation_id=conversation_id,
+            message_id=assistant_message_id,
+            model_id=model_id,
+            skill_id=skill_id,
+            content=content.strip(),
+        )
         yield self._sse(ChatStreamResponse(type="started", messageId=assistant_message_id, content=""))
 
         answer_parts: list[str] = []
@@ -90,6 +100,14 @@ class ChatStreamService:
             history = await self._message_repository.list(conversation_id)
             rag_contexts = await self._rag_service.retrieve(content.strip())
             mcp_tools = await self._mcp_service.list_tools()
+            trace.event(
+                "context.loaded",
+                {
+                    "historyCount": len(history),
+                    "ragContextIds": [context.source_id for context in rag_contexts],
+                    "mcpToolNames": [tool.name for tool in mcp_tools],
+                },
+            )
             graph_state = await self._graph.ainvoke(
                 {
                     "content": content.strip(),
@@ -113,10 +131,12 @@ class ChatStreamService:
             )
             reasoning = graph_state.get("reasoning", "")
             if reasoning:
+                trace.event("reasoning.emitted", {"chars": len(reasoning)})
                 yield self._sse(ChatStreamResponse(type="reasoning", messageId=assistant_message_id, content=reasoning))
 
             async for chunk in self._gateway.stream(model, graph_state["prompt_messages"]):
                 if chunk.type == "reasoning":
+                    trace.event("reasoning.emitted", {"chars": len(chunk.content)})
                     yield self._sse(ChatStreamResponse(type="reasoning", messageId=assistant_message_id, content=chunk.content))
                     continue
                 answer_parts.append(chunk.content)
@@ -133,6 +153,7 @@ class ChatStreamService:
                 message_id=assistant_message_id,
             )
             await self._conversation_repository.touch(conversation_id)
+            trace.end("completed", output=answer)
             yield self._sse(ChatStreamResponse(type="completed", messageId=assistant_message_id, content=""))
         except Exception as error:
             logger.exception(
@@ -151,6 +172,7 @@ class ChatStreamService:
                 status=MessageStatus.FAILED,
                 message_id=assistant_message_id,
             )
+            trace.end("failed", output="".join(answer_parts), error=failure_message)
             yield self._sse(ChatStreamResponse(type="failed", messageId=assistant_message_id, content=failure_message))
 
     def _sse(self, response: ChatStreamResponse) -> str:

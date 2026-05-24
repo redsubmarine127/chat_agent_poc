@@ -54,6 +54,12 @@
           <small>{{ scheduledSessions.length }}/10</small>
           <Settings2 :size="15" />
         </button>
+        <button class="sidebar-tool-button evaluation-tool-button" type="button" @click="openEvaluationPanel">
+          <ClipboardCheck :size="16" />
+          <span>Agent 评估</span>
+          <small>{{ evaluationResult ? `${evaluationResult.averageScore} 分` : '未执行' }}</small>
+          <Settings2 :size="15" />
+        </button>
       </div>
     </aside>
 
@@ -75,6 +81,9 @@
           </button>
           <button type="button" aria-label="定时任务" title="定时任务" @click="openScheduledSessions">
             <Clock :size="16" />
+          </button>
+          <button type="button" aria-label="Agent 评估" title="Agent 评估" @click="openEvaluationPanel">
+            <ClipboardCheck :size="16" />
           </button>
         </div>
       </header>
@@ -596,6 +605,134 @@
         </section>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="evaluationPanelOpen" class="modal-backdrop" @click.self="closeEvaluationPanel">
+        <section class="evaluation-modal" role="dialog" aria-modal="true" aria-labelledby="evaluation-modal-title">
+          <header class="modal-header">
+            <div>
+              <span class="modal-kicker">Agent evaluation</span>
+              <h2 id="evaluation-modal-title">Agent 评估</h2>
+            </div>
+            <button class="modal-close-button" type="button" aria-label="关闭评估面板" @click="closeEvaluationPanel">
+              <X :size="18" />
+            </button>
+          </header>
+
+          <div class="evaluation-layout">
+            <section class="evaluation-config">
+              <div class="settings-section-heading">
+                <div>
+                  <h3>执行方案</h3>
+                  <p>调用后端真实 SSE 接口，自动生成 JSON 与 Markdown 报告。</p>
+                </div>
+                <span>{{ evaluationRunning ? '执行中' : '就绪' }}</span>
+              </div>
+
+              <label>
+                <span>数据集</span>
+                <select v-model="evaluationForm.dataset" :disabled="evaluationRunning">
+                  <option value="smoke_langgraph">冒烟评估</option>
+                  <option value="assistant_quality">质量评估</option>
+                </select>
+              </label>
+              <label>
+                <span>模型</span>
+                <select v-model="evaluationForm.modelId" :disabled="evaluationRunning">
+                  <option value="">使用数据集默认模型</option>
+                  <option v-for="model in models" :key="model.id" :value="model.id">
+                    {{ model.name }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>语义评分</span>
+                <select v-model="evaluationForm.semanticEvaluator" :disabled="evaluationRunning">
+                  <option value="none">关闭 DeepEval</option>
+                  <option value="auto">按用例自动启用</option>
+                  <option value="deepeval">强制 DeepEval</option>
+                </select>
+              </label>
+              <label>
+                <span>通过阈值</span>
+                <input v-model.number="evaluationForm.failUnder" type="number" min="0" max="100" step="1" :disabled="evaluationRunning" />
+              </label>
+
+              <button class="evaluation-run-button" type="button" :disabled="evaluationRunning" @click="handleRunEvaluation">
+                <LoaderCircle v-if="evaluationRunning" :size="16" class="spin-icon" />
+                <ClipboardCheck v-else :size="16" />
+                {{ evaluationRunning ? '评估执行中' : '开始评估' }}
+              </button>
+              <p v-if="evaluationError" class="evaluation-error">{{ evaluationError }}</p>
+            </section>
+
+            <section class="evaluation-result-panel">
+              <div class="settings-section-heading">
+                <div>
+                  <h3>测试结果</h3>
+                  <p>{{ evaluationResult ? '已生成评估报告，可下载查看完整明细。' : '执行后将在这里展示评分、用例状态和报告入口。' }}</p>
+                </div>
+                <span>{{ evaluationResult?.status || '暂无' }}</span>
+              </div>
+
+              <div v-if="evaluationResult" class="evaluation-score-grid">
+                <article>
+                  <span>平均分</span>
+                  <strong>{{ evaluationResult.averageScore }}</strong>
+                </article>
+                <article>
+                  <span>用例数</span>
+                  <strong>{{ evaluationResult.caseCount }}</strong>
+                </article>
+                <article>
+                  <span>通过</span>
+                  <strong>{{ evaluationResult.passCount }}</strong>
+                </article>
+                <article>
+                  <span>错误</span>
+                  <strong>{{ evaluationResult.errorCount }}</strong>
+                </article>
+              </div>
+
+              <div v-if="evaluationResult" class="evaluation-case-list">
+                <article v-for="item in evaluationCases" :key="item.caseId" class="evaluation-case-card">
+                  <div>
+                    <strong>{{ item.name || item.caseId }}</strong>
+                    <span>{{ item.caseId }} · {{ item.status }}</span>
+                  </div>
+                  <b>{{ item.score?.total ?? 0 }}</b>
+                </article>
+              </div>
+
+              <div v-if="evaluationResult" class="evaluation-downloads">
+                <a
+                  v-for="file in evaluationResult.files"
+                  :key="file.filename"
+                  :href="evaluationDownloadUrl(file.downloadUrl)"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Download :size="14" />
+                  下载 {{ file.type === 'json' ? 'JSON' : 'Markdown' }}
+                </a>
+              </div>
+
+              <pre v-if="evaluationResult?.output" class="evaluation-output">{{ evaluationResult.output }}</pre>
+              <div v-if="!evaluationResult && !evaluationRunning" class="evaluation-empty">
+                <ClipboardCheck :size="28" />
+                <strong>尚未执行评估</strong>
+                <p>建议先运行冒烟评估，确认流式协议、导出和后端兼容性。</p>
+              </div>
+            </section>
+          </div>
+
+          <footer class="modal-footer">
+            <span>{{ evaluationFooterText }}</span>
+            <button type="button" @click="closeEvaluationPanel">完成</button>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
   </main>
 </template>
 
@@ -605,6 +742,7 @@ import {
   BrainCircuit,
   BarChart3,
   ChevronDown,
+  ClipboardCheck,
   Clock,
   Cpu,
   Download,
@@ -612,6 +750,7 @@ import {
   FileSpreadsheet,
   FileText,
   History,
+  LoaderCircle,
   Pause,
   Play,
   Plus,
@@ -630,11 +769,13 @@ import {
   deleteConversation,
   downloadExcelFile,
   downloadMarkdownFile,
+  evaluationReportDownloadUrl,
   extractSkillFromConversation,
   listConversations,
   listModels,
   listMessages,
   listSkills,
+  runAgentEvaluation,
   streamMessage,
   uploadFile
 } from './api/client';
@@ -672,6 +813,10 @@ const scheduledSessionHistories = ref([]);
 const selectedScheduledHistorySessionId = ref('');
 const scheduledRunningIds = ref([]);
 const scheduledSessionMessage = ref('');
+const evaluationPanelOpen = ref(false);
+const evaluationRunning = ref(false);
+const evaluationResult = ref(null);
+const evaluationError = ref('');
 let scheduleTimerId = 0;
 const promptSuggestions = [
   '帮我设计一个高并发接口方案',
@@ -696,6 +841,12 @@ const scheduledSessionDraft = reactive({
   frequencyMinutes: 15,
   modelId: '',
   enabled: true
+});
+const evaluationForm = reactive({
+  dataset: 'smoke_langgraph',
+  modelId: '',
+  semanticEvaluator: 'none',
+  failUnder: 80
 });
 
 const activeTitle = computed(() => {
@@ -756,6 +907,20 @@ const scheduledSessionRuntimeText = computed(() => {
     return `${scheduledRunningIds.value.length} 个定时会话执行中`;
   }
   return scheduledSessions.value.length ? '定时会话已就绪' : '尚未配置定时会话';
+});
+
+const evaluationCases = computed(() => {
+  return evaluationResult.value?.report?.results || [];
+});
+
+const evaluationFooterText = computed(() => {
+  if (evaluationRunning.value) {
+    return '正在执行评估，请保持页面打开';
+  }
+  if (!evaluationResult.value) {
+    return '评估结果会保存为可下载报告';
+  }
+  return `${evaluationResult.value.dataset} · ${evaluationResult.value.averageScore} 分 · ${evaluationResult.value.status}`;
 });
 
 watch(messages, scrollToLatestMessage, { deep: true });
@@ -1011,6 +1176,42 @@ function openScheduledHistory(sessionId) {
 
 function closeScheduledHistory() {
   selectedScheduledHistorySessionId.value = '';
+}
+
+function openEvaluationPanel() {
+  evaluationPanelOpen.value = true;
+}
+
+function closeEvaluationPanel() {
+  evaluationPanelOpen.value = false;
+  evaluationError.value = '';
+}
+
+async function handleRunEvaluation() {
+  if (evaluationRunning.value) {
+    return;
+  }
+  evaluationRunning.value = true;
+  evaluationError.value = '';
+  statusText.value = '评估执行中';
+  try {
+    evaluationResult.value = await runAgentEvaluation({
+      dataset: evaluationForm.dataset,
+      modelId: evaluationForm.modelId,
+      semanticEvaluator: evaluationForm.semanticEvaluator,
+      failUnder: Number(evaluationForm.failUnder) || 0
+    });
+    statusText.value = evaluationResult.value.status === 'PASS' ? '评估通过' : '评估需复核';
+  } catch (error) {
+    evaluationError.value = error.message || '评估执行失败';
+    statusText.value = '评估失败';
+  } finally {
+    evaluationRunning.value = false;
+  }
+}
+
+function evaluationDownloadUrl(downloadUrl) {
+  return evaluationReportDownloadUrl(downloadUrl);
 }
 
 function scheduledSessionHistoryCount(sessionId) {

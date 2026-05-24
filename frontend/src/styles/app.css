@@ -1586,7 +1586,8 @@ select {
 }
 
 .settings-modal,
-.schedule-modal {
+.schedule-modal,
+.evaluation-modal {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(1080px, 100%);
@@ -1602,6 +1603,10 @@ select {
 
 .settings-modal {
   width: min(980px, 100%);
+}
+
+.evaluation-modal {
+  width: min(1040px, 100%);
 }
 
 .modal-header,
@@ -1663,6 +1668,227 @@ select {
   gap: 18px;
   overflow-y: auto;
   padding: 18px 22px 22px;
+}
+
+.evaluation-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
+  gap: 18px;
+  overflow-y: auto;
+  padding: 18px 22px 22px;
+}
+
+.evaluation-config,
+.evaluation-result-panel {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.evaluation-config {
+  align-self: start;
+  display: grid;
+  gap: 12px;
+}
+
+.evaluation-config label {
+  display: grid;
+  gap: 7px;
+}
+
+.evaluation-config label > span {
+  color: #607178;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.evaluation-config input,
+.evaluation-config select {
+  width: 100%;
+  height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #f8fbfa;
+  color: #17262d;
+  font-size: 14px;
+  outline: none;
+  padding: 8px 10px;
+}
+
+.evaluation-run-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  border: 1px solid var(--color-brand);
+  border-radius: 11px;
+  background: var(--color-brand);
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.evaluation-run-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.spin-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.evaluation-error {
+  margin: 0;
+  border-radius: 10px;
+  background: #fff2f2;
+  color: #a33a3a;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 9px 10px;
+}
+
+.evaluation-score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.evaluation-score-grid article {
+  border: 1px solid rgba(24, 37, 44, 0.08);
+  border-radius: 12px;
+  background: #f8fbfa;
+  padding: 12px;
+}
+
+.evaluation-score-grid span {
+  display: block;
+  color: #74838a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.evaluation-score-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #17262d;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.evaluation-case-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.evaluation-case-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: #ffffff;
+  padding: 11px 12px;
+}
+
+.evaluation-case-card strong,
+.evaluation-case-card span {
+  display: block;
+}
+
+.evaluation-case-card strong {
+  color: #17262d;
+  font-size: 14px;
+}
+
+.evaluation-case-card span {
+  margin-top: 3px;
+  color: #7b8a91;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.evaluation-case-card b {
+  color: #13785f;
+  font-size: 18px;
+}
+
+.evaluation-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.evaluation-downloads a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  border: 1px solid rgba(19, 120, 95, 0.18);
+  border-radius: 10px;
+  background: #f4fbf8;
+  color: #13785f;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 0 11px;
+  text-decoration: none;
+}
+
+.evaluation-output {
+  max-height: 160px;
+  overflow: auto;
+  margin: 12px 0 0;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: #17262d;
+  color: #d8f5ec;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+.evaluation-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 270px;
+  border: 1px dashed rgba(19, 120, 95, 0.22);
+  border-radius: 14px;
+  background: rgba(248, 252, 250, 0.72);
+  color: #607178;
+  text-align: center;
+  padding: 24px;
+}
+
+.evaluation-empty svg {
+  color: #13785f;
+  margin-bottom: 10px;
+}
+
+.evaluation-empty strong {
+  color: #17262d;
+  font-size: 16px;
+}
+
+.evaluation-empty p {
+  max-width: 320px;
+  margin: 8px 0 0;
+  line-height: 1.7;
 }
 
 .schedule-column {
@@ -2479,7 +2705,8 @@ textarea::placeholder {
   }
 
   .settings-modal,
-  .schedule-modal {
+  .schedule-modal,
+  .evaluation-modal {
     max-height: calc(100vh - 24px);
   }
 
@@ -2493,7 +2720,13 @@ textarea::placeholder {
   }
 
   .settings-grid,
-  .schedule-grid {
+  .schedule-grid,
+  .evaluation-layout {
     padding: 16px;
+  }
+
+  .evaluation-layout,
+  .evaluation-score-grid {
+    grid-template-columns: 1fr;
   }
 }

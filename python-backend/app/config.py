@@ -53,6 +53,15 @@ class McpConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class LangfuseConfig:
+    enabled: bool
+    host: str
+    public_key: str
+    secret_key: str
+    environment: str
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     server_host: str
     server_port: int
@@ -65,6 +74,7 @@ class Settings:
     models: tuple[ModelConfig, ...]
     rag: RagConfig
     mcp: McpConfig
+    langfuse: LangfuseConfig
 
 
 def load_dotenv_file() -> None:
@@ -183,5 +193,12 @@ def get_settings() -> Settings:
                 McpToolConfig("context.search", "从当前项目配置的 RAG 知识源中检索相关上下文，入参包含 query 与可选 limit。"),
                 McpToolConfig("artifact.export", "预留导出工具边界，后续可接入 Markdown、Excel、PPT 或其他文件生成器。"),
             ),
+        ),
+        langfuse=LangfuseConfig(
+            enabled=env_bool("LANGFUSE_ENABLED", True),
+            host=env("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+            public_key=env("LANGFUSE_PUBLIC_KEY", ""),
+            secret_key=env("LANGFUSE_SECRET_KEY", ""),
+            environment=env("LANGFUSE_ENVIRONMENT", "local"),
         ),
     )

@@ -1,0 +1,27 @@
+services:
+  opengauss:
+    build:
+      context: ./docker/opengauss
+    image: assistant-opengauss:5.0.0-md5
+    container_name: assistant-opengauss
+    privileged: true
+    environment:
+      GS_PASSWORD: OpenGauss@123
+      GS_DB: assistant
+      GS_USERNAME: assistant
+      GS_HOST_AUTH_METHOD: md5
+      NODE_NAME: assistant-opengauss
+      GS_PORT: 5432
+    command: ["-c", "password_encryption_type=0"]
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - assistant-opengauss-data:/var/lib/opengauss/data
+    healthcheck:
+      test: ["CMD-SHELL", "LD_LIBRARY_PATH=/usr/local/opengauss/lib /usr/local/opengauss/bin/gsql -h 127.0.0.1 -d assistant -U assistant -W OpenGauss@123 -p 5432 -c 'select 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  assistant-opengauss-data:

@@ -1,0 +1,45 @@
+{
+  "name": "smoke_langgraph",
+  "description": "用于快速验证 Python LangGraph 后端的确定性冒烟数据集，默认使用 local-fallback 模型。",
+  "defaultModelId": "local-fallback",
+  "defaultSkillId": "general",
+  "cases": [
+    {
+      "id": "smoke_table_stream",
+      "name": "流式表格输出",
+      "prompt": "请用两行 Markdown 表格验证 Python LangGraph 后端，并简短说明状态。",
+      "expected": {
+        "minAnswerChars": 40,
+        "keywords": ["Python", "LangGraph", "SSE"],
+        "forbidden": ["Traceback", "Exception", "服务暂时不可用"],
+        "requires": {
+          "reasoning": true,
+          "table": true,
+          "completedEvent": true
+        },
+        "exports": ["markdown", "excel"],
+        "maxFirstTokenMs": 5000,
+        "maxTotalMs": 20000
+      }
+    },
+    {
+      "id": "smoke_reasoning",
+      "name": "思考过程与正式回答",
+      "prompt": "请说明当前 Agent 的处理步骤，并输出一个状态表。",
+      "expected": {
+        "minAnswerChars": 40,
+        "keywords": ["本地回退响应", "状态"],
+        "forbidden": ["Traceback", "Exception", "null"],
+        "requires": {
+          "reasoning": true,
+          "table": true,
+          "completedEvent": true
+        },
+        "exports": ["markdown"],
+        "maxFirstTokenMs": 5000,
+        "maxTotalMs": 20000
+      }
+    }
+  ]
+}
+

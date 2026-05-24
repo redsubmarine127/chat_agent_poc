@@ -1,0 +1,80 @@
+{
+  "name": "assistant_quality",
+  "description": "面向真实模型的智能对话助手质量评估数据集，可同时跑 Java 后端与 Python 后端进行对比。",
+  "defaultModelId": "deepseek-v4-flash",
+  "defaultSkillId": "general",
+  "cases": [
+    {
+      "id": "architecture_plan",
+      "name": "架构方案完整性",
+      "prompt": "请为一个高并发智能对话助手设计后端架构，要求包含 DDD 分层、SSE 流式输出、文件上传、模型路由和异常处理。",
+      "skillId": "java-architect",
+      "expected": {
+        "minAnswerChars": 600,
+        "keywords": ["DDD", "SSE", "模型路由", "文件上传", "异常处理"],
+        "forbidden": ["无法回答", "不知道", "Traceback", "NullPointerException"],
+        "requires": {
+          "reasoning": true,
+          "table": false,
+          "completedEvent": true
+        },
+        "maxFirstTokenMs": 15000,
+        "maxTotalMs": 90000
+      }
+    },
+    {
+      "id": "code_block",
+      "name": "代码块展示",
+      "prompt": "请给出一个 Java 21 Record 请求对象和 Spring WebFlux Controller 示例，要求使用 Markdown 代码块输出。",
+      "skillId": "java-architect",
+      "expected": {
+        "minAnswerChars": 400,
+        "keywords": ["record", "Controller", "Mono", "Flux"],
+        "forbidden": ["```text\n无法", "Traceback"],
+        "requires": {
+          "reasoning": true,
+          "codeBlock": true,
+          "completedEvent": true
+        },
+        "maxFirstTokenMs": 15000,
+        "maxTotalMs": 90000
+      }
+    },
+    {
+      "id": "table_export",
+      "name": "表格与导出",
+      "prompt": "请输出一张 Markdown 表格，对比 Java 后端和 Python LangGraph 后端在架构、流式输出、模型接入、测试方面的差异。",
+      "expected": {
+        "minAnswerChars": 300,
+        "keywords": ["Java", "Python", "LangGraph", "流式输出"],
+        "forbidden": ["Traceback", "Exception"],
+        "requires": {
+          "reasoning": true,
+          "table": true,
+          "completedEvent": true
+        },
+        "exports": ["markdown", "excel"],
+        "maxFirstTokenMs": 15000,
+        "maxTotalMs": 90000
+      }
+    },
+    {
+      "id": "risk_review",
+      "name": "风险审查能力",
+      "prompt": "请审查一个支持文件上传和模型流式输出的 Agent 后端，列出 8 个生产风险，并给出缓解措施。",
+      "skillId": "code-review",
+      "expected": {
+        "minAnswerChars": 500,
+        "keywords": ["风险", "缓解", "文件上传", "模型", "日志"],
+        "forbidden": ["一切正常", "没有风险", "Traceback"],
+        "requires": {
+          "reasoning": true,
+          "completedEvent": true
+        },
+        "maxFirstTokenMs": 15000,
+        "maxTotalMs": 90000
+      }
+    }
+  ]
+}
+

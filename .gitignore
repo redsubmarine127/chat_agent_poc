@@ -1,0 +1,22 @@
+.DS_Store
+.env
+.idea/
+.m2/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Java
+target/
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Runtime data
+data/
+backend/data/
+python-backend/data/
+python-backend/.env
+python-backend/.venv/

@@ -1,0 +1,123 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: intelligent-assistant
+  r2dbc:
+    url: ${DB_R2DBC_URL:r2dbc:postgresql://localhost:5432/assistant}
+    username: ${DB_USERNAME:assistant}
+    password: ${DB_PASSWORD:OpenGauss@123}
+  flyway:
+    enabled: false
+    url: ${DB_JDBC_URL:jdbc:opengauss://localhost:5432/assistant}
+    driver-class-name: ${DB_JDBC_DRIVER:org.opengauss.Driver}
+    user: ${DB_FLYWAY_USERNAME:assistant}
+    password: ${DB_FLYWAY_PASSWORD:OpenGauss@123}
+  codec:
+    max-in-memory-size: 8MB
+  ai:
+    model:
+      chat: ${SPRING_AI_MODEL_CHAT:none}
+    dashscope:
+      enabled: ${SPRING_AI_DASHSCOPE_ENABLED:false}
+      api-key: ${DASHSCOPE_API_KEY:}
+      chat:
+        options:
+          model: ${DASHSCOPE_MODEL:qwen-plus}
+
+assistant:
+  migration:
+    enabled: ${ASSISTANT_MIGRATION_ENABLED:true}
+  storage:
+    root-path: ${ASSISTANT_STORAGE_ROOT:./data/uploads}
+    max-file-size: ${ASSISTANT_MAX_FILE_SIZE:10485760}
+    allowed-content-types:
+      - text/plain
+      - text/markdown
+      - application/pdf
+      - image/png
+      - image/jpeg
+  skills:
+    - id: general
+      name: 通用助手
+      description: 适合日常问答、总结和分析。
+      enabled: true
+    - id: code-review
+      name: 代码审查
+      description: 聚焦缺陷、风险、可维护性和测试缺口。
+      enabled: true
+    - id: java-architect
+      name: Java 架构师
+      description: 针对 Java、Spring Boot、微服务和 DDD 提供架构建议。
+      enabled: true
+  default-model-id: deepseek-v4-flash
+  models:
+    - id: local-fallback
+      name: 本地回退模型
+      provider: local
+      model-name: local-fallback
+      base-url: ""
+      api-key: ""
+      enabled: true
+    - id: gpt-5.5
+      name: GPT-5.5
+      provider: openai
+      model-name: ${OPENAI_MODEL_NAME:gpt-5.5}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+      api-key: ${OPENAI_API_KEY:}
+      enabled: true
+    - id: minimax-2.7
+      name: MiniMax 2.7
+      provider: openai-compatible
+      model-name: ${MINIMAX_MODEL_NAME:minimax-2.7}
+      base-url: ${MINIMAX_BASE_URL:https://api.minimax.chat/v1}
+      api-key: ${MINIMAX_API_KEY:}
+      enabled: true
+    - id: deepseek-v4-pro
+      name: DeepSeek V4 Pro
+      provider: openai-compatible
+      model-name: ${DEEPSEEK_PRO_MODEL_NAME:deepseek-v4-pro}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
+      api-key: ${DEEPSEEK_API_KEY:}
+      enabled: true
+    - id: deepseek-v4-flash
+      name: DeepSeek V4 Flash
+      provider: openai-compatible
+      model-name: ${DEEPSEEK_FLASH_MODEL_NAME:deepseek-v4-flash}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
+      api-key: ${DEEPSEEK_API_KEY:}
+      enabled: true
+    - id: glm-5.1
+      name: GLM 5.1
+      provider: openai-compatible
+      model-name: ${GLM_MODEL_NAME:glm-5.1}
+      base-url: ${GLM_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+      api-key: ${GLM_API_KEY:}
+      enabled: true
+  rag:
+    enabled: ${ASSISTANT_RAG_ENABLED:true}
+    top-k: ${ASSISTANT_RAG_TOP_K:5}
+    documents:
+      - id: product-capabilities
+        title: 智能对话助手能力边界
+        content: 支持对话创建、切换、删除、清空上下文、流式输出、Skill 管理、文件上传、Markdown 与 Excel 导出、图表展示和模型动态选择。
+      - id: backend-architecture
+        title: 后端架构说明
+        content: Java 后端采用 Spring Boot WebFlux、轻量 DDD 分层、R2DBC 数据访问、OpenAI-compatible 模型网关、本地回退模型和统一异常处理。
+      - id: python-langgraph
+        title: Python LangGraph 后端说明
+        content: Python 后端采用 FastAPI、LangGraph、PostgreSQL/openGauss 兼容存储，并保持与 Java 后端一致的前端 API 契约。
+  mcp:
+    enabled: ${ASSISTANT_MCP_ENABLED:true}
+    tools:
+      - name: context.search
+        description: 从当前项目配置的 RAG 知识源中检索相关上下文，入参包含 query 与可选 limit。
+        enabled: true
+      - name: artifact.export
+        description: 预留导出工具边界，后续可接入 Markdown、Excel、PPT 或其他文件生成器。
+        enabled: true
+
+logging:
+  level:
+    com.example.assistant: INFO

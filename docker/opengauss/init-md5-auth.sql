@@ -1,0 +1,2 @@
+GRANT ALL PRIVILEGES TO assistant;
+GRANT ALL PRIVILEGES ON DATABASE assistant TO assistant;

@@ -43,8 +43,10 @@
 
 ## Persistence
 
-- The Python backend MUST connect to openGauss using PostgreSQL-compatible asyncpg.
-- The Python backend MUST ensure schema idempotently at startup.
+- The Python backend MUST default to in-memory persistence for quick local testing.
+- `ASSISTANT_PERSISTENCE_MODE=memory` MUST store conversation, message, attachment metadata, and dynamic Skill data in process memory.
+- `ASSISTANT_PERSISTENCE_MODE=database` MUST connect to openGauss using PostgreSQL-compatible asyncpg.
+- The Python backend MUST ensure schema idempotently at startup only in database mode.
 - The asyncpg pool MUST use an openGauss-compatible reset strategy.
 - Conversation, message, attachment, and dynamic Skill storage MUST match the Java backend schema.
 

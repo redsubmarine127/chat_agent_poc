@@ -9,6 +9,7 @@ def build_settings() -> Settings:
     return Settings(
         server_host="127.0.0.1",
         server_port=8090,
+        persistence_mode="memory",
         db_dsn="postgresql://assistant:password@127.0.0.1:5432/assistant",
         storage_root=__import__("pathlib").Path("/tmp"),
         max_file_size=1024,

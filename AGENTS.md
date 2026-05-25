@@ -7,6 +7,7 @@ Before editing this repository, read:
 3. The spec for the area you are changing under `openspec/specs/`
 4. The relevant local README:
    - `README.md`
+   - `backend/README.md`
    - `python-backend/README.md`
    - `agent-evals/README.md`
 
@@ -18,12 +19,13 @@ Before editing this repository, read:
 - Python LangGraph backend runs on `8090`.
 - Java frontend test page usually runs on `5173`.
 - Python frontend test page usually runs on `5175`.
-- openGauss is the default database.
+- `ASSISTANT_PERSISTENCE_MODE=memory` is the default quick-test storage mode.
+- openGauss is the default durable database when `ASSISTANT_PERSISTENCE_MODE=database`.
 
 ## Non-Negotiables
 
 - Do not commit secrets or API keys.
-- Keep Java and Python backend frontend-facing APIs compatible unless OpenSpec is updated first.
+- Keep Java and Python backend frontend-facing APIs and persistence-mode semantics compatible unless OpenSpec is updated first.
 - Preserve SSE event shape: `started`, `reasoning`, `delta`, `completed`, `failed`.
 - Preserve rich frontend rendering for Markdown, code blocks, tables, charts, and exports.
 - Use `agent-evals/` when changing Agent behavior, streaming, rendering, export, model routing, or backend compatibility.
@@ -52,4 +54,3 @@ python-backend/.venv/bin/python agent-evals/run_evals.py \
   --dataset agent-evals/datasets/smoke_langgraph.json \
   --fail-under 80
 ```
-

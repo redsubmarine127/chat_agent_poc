@@ -2,7 +2,9 @@
 
 ## Local Development
 
-- openGauss SHOULD be started with `docker-compose up -d`.
+- Java and Python backends SHOULD start in memory mode by default, without openGauss.
+- openGauss SHOULD be started with `docker-compose up -d` only when testing durable database mode.
+- Durable database mode SHOULD be enabled with `ASSISTANT_PERSISTENCE_MODE=database`.
 - Java backend SHOULD run on port `8080`.
 - Python backend SHOULD run on port `8090`.
 - Java-targeted frontend SHOULD run on port `5173`.
@@ -54,4 +56,3 @@ In addition to OpenSpec, the project SHOULD maintain:
 - ADRs under `docs/adr/`: architecture decision records for database, model gateway, streaming protocol, and evaluation strategy.
 - Evaluation reports under `agent-evals/reports/`: historical evidence of behavior changes.
 - API contract tests: black-box tests that run against both Java and Python backends.
-

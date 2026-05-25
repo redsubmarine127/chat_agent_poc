@@ -15,7 +15,7 @@ from app.database import Database
 from app.errors import AssistantError
 from app.models import ErrorResponse
 from app.observability import build_observability
-from app.repositories import AttachmentRepository, ConversationRepository, DynamicSkillRepository, MessageRepository
+from app.repositories import AttachmentRepository, ConversationRepository, DynamicSkillRepository, InMemoryRepositoryBundle, MessageRepository
 from app.services.chat_service import ChatStreamService, ConversationService
 from app.services.export_service import ExportService
 from app.services.evaluation_service import EvaluationService
@@ -32,14 +32,24 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    database = Database(settings)
-    await database.connect()
-    await database.migrate()
+    database: Database | None = None
 
-    conversation_repository = ConversationRepository(database)
-    message_repository = MessageRepository(database)
-    attachment_repository = AttachmentRepository(database)
-    dynamic_skill_repository = DynamicSkillRepository(database)
+    if settings.persistence_mode == "database":
+        database = Database(settings)
+        await database.connect()
+        await database.migrate()
+        conversation_repository = ConversationRepository(database)
+        message_repository = MessageRepository(database)
+        attachment_repository = AttachmentRepository(database)
+        dynamic_skill_repository = DynamicSkillRepository(database)
+        logger.info("persistence_mode_selected mode=database")
+    else:
+        repositories = InMemoryRepositoryBundle()
+        conversation_repository = repositories.conversations
+        message_repository = repositories.messages
+        attachment_repository = repositories.attachments
+        dynamic_skill_repository = repositories.dynamic_skills
+        logger.info("persistence_mode_selected mode=memory")
 
     model_service = ModelService(settings)
     skill_service = SkillService(settings, dynamic_skill_repository, message_repository)
@@ -73,7 +83,8 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        await database.close()
+        if database is not None:
+            await database.close()
 
 
 app = FastAPI(title="Intelligent Assistant Python Backend", version="0.1.0", lifespan=lifespan)

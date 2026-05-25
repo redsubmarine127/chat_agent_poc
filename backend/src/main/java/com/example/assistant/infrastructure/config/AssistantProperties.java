@@ -14,6 +14,7 @@ import java.util.List;
 @Validated
 @ConfigurationProperties(prefix = "assistant")
 public record AssistantProperties(
+        @Valid Persistence persistence,
         @Valid Storage storage,
         @NotEmpty List<@Valid SkillConfig> skills,
         @NotBlank String defaultModelId,
@@ -24,6 +25,7 @@ public record AssistantProperties(
 
     @ConstructorBinding
     public AssistantProperties {
+        persistence = persistence == null ? Persistence.memory() : persistence;
         skills = List.copyOf(skills == null ? List.of() : skills);
         models = List.copyOf(models == null ? List.of() : models);
         rag = rag == null ? Rag.disabled() : rag;
@@ -36,7 +38,25 @@ public record AssistantProperties(
             String defaultModelId,
             List<ModelConfig> models
     ) {
-        this(storage, skills, defaultModelId, models, Rag.disabled(), Mcp.disabled());
+        this(Persistence.memory(), storage, skills, defaultModelId, models, Rag.disabled(), Mcp.disabled());
+    }
+
+    public record Persistence(
+            Mode mode
+    ) {
+
+        public Persistence {
+            mode = mode == null ? Mode.MEMORY : mode;
+        }
+
+        public static Persistence memory() {
+            return new Persistence(Mode.MEMORY);
+        }
+    }
+
+    public enum Mode {
+        MEMORY,
+        DATABASE
     }
 
     public record Storage(

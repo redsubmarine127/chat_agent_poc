@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -229,3 +230,148 @@ class DynamicSkillRepository:
         async with self._database.acquire() as connection:
             row = await connection.fetchrow(query, skill_id, name, description, utc_now())
         return SkillResponse(id=row["id"], name=row["name"], description=row["description"], enabled=row["enabled"])
+
+
+class InMemoryConversationRepository:
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._conversations: dict[UUID, ConversationResponse] = {}
+        self._deleted_ids: set[UUID] = set()
+
+    async def list(self) -> list[ConversationResponse]:
+        async with self._lock:
+            conversations = [
+                conversation
+                for conversation in self._conversations.values()
+                if conversation.id not in self._deleted_ids
+            ]
+        return sorted(conversations, key=lambda conversation: conversation.updatedAt, reverse=True)[:100]
+
+    async def create(self, title: str) -> ConversationResponse:
+        now = utc_now()
+        conversation = ConversationResponse(id=uuid4(), title=title.strip() or "新的对话", createdAt=now, updatedAt=now)
+        async with self._lock:
+            self._conversations[conversation.id] = conversation
+        logger.info("memory_conversation_created conversation_id=%s", conversation.id)
+        return conversation
+
+    async def ensure_exists(self, conversation_id: UUID) -> None:
+        async with self._lock:
+            exists = conversation_id in self._conversations and conversation_id not in self._deleted_ids
+        if not exists:
+            raise NotFoundError("对话不存在")
+
+    async def delete(self, conversation_id: UUID) -> None:
+        await self.ensure_exists(conversation_id)
+        async with self._lock:
+            self._deleted_ids.add(conversation_id)
+            conversation = self._conversations[conversation_id]
+            self._conversations[conversation_id] = conversation.model_copy(update={"updatedAt": utc_now()})
+        logger.info("memory_conversation_deleted conversation_id=%s", conversation_id)
+
+    async def touch(self, conversation_id: UUID) -> None:
+        await self.ensure_exists(conversation_id)
+        async with self._lock:
+            conversation = self._conversations[conversation_id]
+            self._conversations[conversation_id] = conversation.model_copy(update={"updatedAt": utc_now()})
+
+
+class InMemoryMessageRepository:
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._messages: dict[UUID, MessageResponse] = {}
+
+    async def list(self, conversation_id: UUID) -> list[MessageResponse]:
+        async with self._lock:
+            messages = [
+                message
+                for message in self._messages.values()
+                if message.conversationId == conversation_id
+            ]
+        return sorted(messages, key=lambda message: message.createdAt)
+
+    async def save(
+        self,
+        conversation_id: UUID,
+        role: MessageRole,
+        content: str,
+        skill_id: str | None,
+        attachment_ids: list[UUID],
+        status: MessageStatus = MessageStatus.COMPLETED,
+        message_id: UUID | None = None,
+    ) -> MessageResponse:
+        message = MessageResponse(
+            id=message_id or uuid4(),
+            conversationId=conversation_id,
+            role=role,
+            content=content,
+            skillId=skill_id,
+            attachmentIds=list(attachment_ids),
+            status=status,
+            createdAt=utc_now(),
+        )
+        async with self._lock:
+            self._messages[message.id] = message
+        logger.info("memory_message_saved conversation_id=%s message_id=%s role=%s status=%s", conversation_id, message.id, role.value, status.value)
+        return message
+
+    async def clear(self, conversation_id: UUID) -> None:
+        async with self._lock:
+            message_ids = [
+                message_id
+                for message_id, message in self._messages.items()
+                if message.conversationId == conversation_id
+            ]
+            for message_id in message_ids:
+                self._messages.pop(message_id, None)
+        logger.info("memory_messages_cleared conversation_id=%s count=%s", conversation_id, len(message_ids))
+
+
+class InMemoryAttachmentRepository:
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._attachments: dict[UUID, AttachmentResponse] = {}
+
+    async def save(self, original_filename: str, content_type: str, storage_key: str, size_in_bytes: int) -> AttachmentResponse:
+        attachment = AttachmentResponse(
+            id=uuid4(),
+            originalFilename=original_filename,
+            contentType=content_type,
+            storageKey=storage_key,
+            sizeInBytes=size_in_bytes,
+            createdAt=utc_now(),
+        )
+        async with self._lock:
+            self._attachments[attachment.id] = attachment
+        logger.info("memory_attachment_saved attachment_id=%s storage_key=%s", attachment.id, storage_key)
+        return attachment
+
+
+class InMemoryDynamicSkillRepository:
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._skills: dict[str, tuple[SkillResponse, datetime]] = {}
+
+    async def list_enabled(self) -> list[SkillResponse]:
+        async with self._lock:
+            skills = [
+                (skill, created_at)
+                for skill, created_at in self._skills.values()
+                if skill.enabled
+            ]
+        return [skill for skill, _ in sorted(skills, key=lambda item: item[1], reverse=True)]
+
+    async def save(self, skill_id: str, name: str, description: str) -> SkillResponse:
+        skill = SkillResponse(id=skill_id, name=name, description=description, enabled=True)
+        async with self._lock:
+            self._skills[skill_id] = (skill, utc_now())
+        logger.info("memory_dynamic_skill_saved skill_id=%s", skill_id)
+        return skill
+
+
+class InMemoryRepositoryBundle:
+    def __init__(self) -> None:
+        self.conversations = InMemoryConversationRepository()
+        self.messages = InMemoryMessageRepository()
+        self.attachments = InMemoryAttachmentRepository()
+        self.dynamic_skills = InMemoryDynamicSkillRepository()

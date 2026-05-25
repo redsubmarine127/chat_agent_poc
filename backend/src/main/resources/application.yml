@@ -27,6 +27,8 @@ spring:
           model: ${DASHSCOPE_MODEL:qwen-plus}
 
 assistant:
+  persistence:
+    mode: ${ASSISTANT_PERSISTENCE_MODE:memory}
   migration:
     enabled: ${ASSISTANT_MIGRATION_ENABLED:true}
   storage:

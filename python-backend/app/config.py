@@ -65,6 +65,7 @@ class LangfuseConfig:
 class Settings:
     server_host: str
     server_port: int
+    persistence_mode: str
     db_dsn: str
     storage_root: Path
     max_file_size: int
@@ -105,6 +106,7 @@ def get_settings() -> Settings:
     return Settings(
         server_host=env("SERVER_HOST", "0.0.0.0"),
         server_port=int(env("SERVER_PORT", "8090")),
+        persistence_mode=env("ASSISTANT_PERSISTENCE_MODE", "memory").strip().lower(),
         db_dsn=env("DB_DSN", "postgresql://assistant:OpenGauss%40123@127.0.0.1:5432/assistant"),
         storage_root=Path(env("ASSISTANT_STORAGE_ROOT", "./data/uploads")).resolve(),
         max_file_size=int(env("ASSISTANT_MAX_FILE_SIZE", "10485760")),

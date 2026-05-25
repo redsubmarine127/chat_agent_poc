@@ -10,10 +10,13 @@
 
 ## Persistence
 
-- The Java backend MUST use openGauss by default.
+- The Java backend MUST default to in-memory persistence for quick local testing.
+- `ASSISTANT_PERSISTENCE_MODE=memory` MUST store conversation, message, attachment metadata, and dynamic Skill data in process memory.
+- `ASSISTANT_PERSISTENCE_MODE=database` MUST switch storage to openGauss.
 - R2DBC/JDBC access MAY use PostgreSQL-compatible protocol/drivers when connecting to openGauss.
 - Schema MUST include conversations, chat messages, attachments, and dynamic Skills.
 - Migrations or schema initialization MUST be repeatable and idempotent.
+- Database migrations MUST NOT run in memory mode.
 
 ## Model Support
 

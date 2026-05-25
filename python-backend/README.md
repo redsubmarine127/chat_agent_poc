@@ -9,7 +9,7 @@
 | Web 框架 | FastAPI |
 | 对话编排 | LangGraph |
 | 流式输出 | SSE `text/event-stream` |
-| 数据库 | openGauss，使用 PostgreSQL 协议连接 |
+| 持久化 | 默认内存存储，可切换 openGauss |
 | 模型接入 | OpenAI-compatible HTTP 流式接口，本地回退模型 |
 | 文件导出 | Markdown / XLSX |
 
@@ -23,23 +23,58 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[test]"
 cp .env.example .env
-uvicorn app.main:app --host 0.0.0.0 --port 8090 --reload
 ```
 
 如果本机默认 `python3` 已经是 3.11 及以上，也可以使用 `python3 -m venv .venv`。
 
-数据库沿用根目录的 openGauss：
+### 快速内存模式
+
+默认就是内存模式，不需要启动数据库：
+
+```bash
+export ASSISTANT_PERSISTENCE_MODE=memory
+uvicorn app.main:app --host 127.0.0.1 --port 8090 --reload
+```
+
+内存模式会保存对话、消息、附件元信息和动态 Skill 到当前 Python 进程中，服务重启后数据会清空。上传文件本体仍写入 `ASSISTANT_STORAGE_ROOT` 指向的本地目录。
+
+### openGauss 数据库模式
+
+需要持久化数据时启动根目录的 openGauss：
 
 ```bash
 cd ..
 docker-compose up -d
 ```
 
+然后启动 Python 后端：
+
+```bash
+cd python-backend
+export ASSISTANT_PERSISTENCE_MODE=database
+export DB_DSN=postgresql://assistant:OpenGauss%40123@127.0.0.1:5432/assistant
+uvicorn app.main:app --host 127.0.0.1 --port 8090 --reload
+```
+
+### 常用配置
+
+```bash
+export ASSISTANT_STORAGE_ROOT=./data/uploads
+export ASSISTANT_DEFAULT_MODEL_ID=deepseek-v4-flash
+export DEEPSEEK_API_KEY=your-api-key
+export DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+export OPENAI_API_KEY=your-api-key
+export OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+没有配置模型 Key 时会自动走本地回退模型，便于验证页面和流式接口。
+
 ## 前端切换
 
 将 Vite 代理或环境变量切到 Python 后端：
 
 ```bash
+cd frontend
 VITE_API_BASE_URL=http://127.0.0.1:8090 npm run dev
 ```
 
@@ -82,7 +117,7 @@ flowchart TD
 ## 测试
 
 ```bash
-pytest
+.venv/bin/pytest
 ```
 
 ## Langfuse 观测

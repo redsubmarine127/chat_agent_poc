@@ -323,6 +323,8 @@
                   :key="skill.id"
                   class="skill-card"
                   :class="{ active: selectedSkillId === skill.id && isSkillLoaded(skill.id), disabled: !isSkillLoaded(skill.id) }"
+                  :aria-disabled="!isSkillLoaded(skill.id)"
+                  :title="isSkillLoaded(skill.id) ? '设为本次发送使用的 Skill' : '请先打开右侧开关加载 Skill'"
                   @click="selectSkillFromModal(skill.id)"
                 >
                   <div class="skill-card-icon">
@@ -785,6 +787,11 @@ import {
   extractMarkdownTables,
   sanitizeFilename
 } from './utils/messageArtifacts';
+import {
+  normalizeSkillSelection,
+  selectLoadedSkill,
+  toggleSkillLoad as toggleSkillLoadState
+} from './utils/skillSelection';
 
 const conversations = ref([]);
 const messages = ref([]);
@@ -874,6 +881,9 @@ const loadedSkills = computed(() => {
 });
 
 const selectedSkillName = computed(() => {
+  if (!isSkillLoaded(selectedSkillId.value)) {
+    return '选择 Skill';
+  }
   return skills.value.find((item) => item.id === selectedSkillId.value)?.name || '选择 Skill';
 });
 
@@ -1042,8 +1052,7 @@ function usePrompt(prompt) {
 
 async function loadSkills() {
   skills.value = await listSkills();
-  loadedSkillIds.value = [];
-  selectedSkillId.value = skills.value[0]?.id || '';
+  applySkillSelectionState(normalizeSkillSelection(skills.value, [], ''));
 }
 
 async function loadModels() {
@@ -1333,24 +1342,27 @@ function isSkillLoaded(skillId) {
 }
 
 function toggleSkillLoad(skillId, checked) {
-  if (checked) {
-    loadedSkillIds.value = [...new Set([...loadedSkillIds.value, skillId])];
-    if (!selectedSkillId.value || !isSkillLoaded(selectedSkillId.value)) {
-      selectedSkillId.value = skillId;
-    }
-    return;
-  }
-  loadedSkillIds.value = loadedSkillIds.value.filter((id) => id !== skillId);
-  if (selectedSkillId.value === skillId) {
-    selectedSkillId.value = loadedSkillIds.value[0] || skills.value[0]?.id || '';
-  }
+  applySkillSelectionState(toggleSkillLoadState(
+    skills.value,
+    loadedSkillIds.value,
+    selectedSkillId.value,
+    skillId,
+    checked
+  ));
 }
 
 function selectSkillFromModal(skillId) {
-  if (!isSkillLoaded(skillId)) {
-    toggleSkillLoad(skillId, true);
-  }
-  selectedSkillId.value = skillId;
+  applySkillSelectionState(selectLoadedSkill(
+    skills.value,
+    loadedSkillIds.value,
+    selectedSkillId.value,
+    skillId
+  ));
+}
+
+function applySkillSelectionState(state) {
+  loadedSkillIds.value = state.loadedSkillIds;
+  selectedSkillId.value = state.selectedSkillId;
 }
 
 async function handleFileSelection(event) {

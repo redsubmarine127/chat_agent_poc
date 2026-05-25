@@ -2309,6 +2309,7 @@ select {
 
 .skill-card.disabled {
   opacity: 0.58;
+  cursor: default;
 }
 
 .skill-card-icon {

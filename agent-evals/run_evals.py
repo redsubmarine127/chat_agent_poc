@@ -8,7 +8,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 from urllib import error, parse, request
 
 from evaluators import evaluate_semantic_quality
@@ -125,12 +125,12 @@ def run_case(
             timeout=timeout,
         )
         export_results = run_exports(base_url, stream_result["answer"], expected.get("exports", []), timeout)
-        semantic_result = evaluate_semantic_quality(
+        semantic_result = safe_evaluate_semantic_quality(
             mode=semantic_evaluator,
             prompt=case["prompt"],
             answer=stream_result["answer"],
             expected=expected,
-        ).as_dict()
+        )
         score = score_case(stream_result, export_results, expected, semantic_result=semantic_result)
         status = "PASS" if score["total"] >= case.get("passScore", 75) else "NEEDS_REVIEW"
         error_message = ""
@@ -309,6 +309,7 @@ def score_case(
     metrics = stream_result["metrics"]
     requires = expected.get("requires", {})
     keywords = expected.get("keywords", [])
+    keyword_groups = expected.get("keywordGroups", [])
     forbidden = expected.get("forbidden", [])
 
     checks: dict[str, bool] = {
@@ -325,7 +326,7 @@ def score_case(
         "totalLatency": latency_ok(metrics.get("totalMs"), expected.get("maxTotalMs")),
     }
 
-    keyword_hits = [keyword for keyword in keywords if keyword.lower() in answer.lower()]
+    keyword_hits, keyword_misses, keyword_total = evaluate_keyword_expectations(answer, keywords, keyword_groups)
     forbidden_hits = [word for word in forbidden if word.lower() in (answer + reasoning + request_error).lower()]
     checks["forbiddenClean"] = not forbidden_hits
     checks["exports"] = all(item.get("ok") for item in export_results.values()) if export_results else True
@@ -343,7 +344,7 @@ def score_case(
         accuracy = 20 * max(0.0, min(1.0, float(semantic_score)))
     else:
         accuracy = 0
-        accuracy += 15 * (len(keyword_hits) / len(keywords)) if keywords else 15
+        accuracy += 15 * (len(keyword_hits) / keyword_total) if keyword_total else 15
         accuracy += 5 if checks["forbiddenClean"] else 0
 
     format_checks = ["reasoning", "table", "codeBlock", "orderedList", "exports"]
@@ -380,10 +381,57 @@ def score_case(
         "dimensions": dimensions,
         "checks": checks,
         "keywordHits": keyword_hits,
+        "keywordMisses": keyword_misses,
         "forbiddenHits": forbidden_hits,
         "requestError": request_error,
         "semantic": semantic_result or {"enabled": False, "provider": "none"},
     }
+
+
+def safe_evaluate_semantic_quality(
+    *,
+    mode: str,
+    prompt: str,
+    answer: str,
+    expected: dict[str, Any],
+    evaluator: Callable[..., Any] = evaluate_semantic_quality,
+) -> dict[str, Any]:
+    try:
+        return evaluator(mode=mode, prompt=prompt, answer=answer, expected=expected).as_dict()
+    except RuntimeError as exc:
+        if mode in {"auto", "deepeval"} and expected.get("semantic"):
+            return {
+                "enabled": False,
+                "provider": "deepeval",
+                "score": None,
+                "reason": "",
+                "skipped": True,
+                "error": str(exc),
+            }
+        raise
+
+
+def evaluate_keyword_expectations(
+    answer: str,
+    keywords: list[str],
+    keyword_groups: list[dict[str, Any]],
+) -> tuple[list[str], list[str], int]:
+    normalized_answer = answer.lower()
+    hits = [keyword for keyword in keywords if keyword.lower() in normalized_answer]
+    misses = [keyword for keyword in keywords if keyword.lower() not in normalized_answer]
+
+    for group in keyword_groups:
+        group_name = str(group.get("name") or "").strip()
+        alternatives = [str(item).strip() for item in group.get("anyOf", []) if str(item).strip()]
+        if not alternatives:
+            continue
+        display_name = group_name or alternatives[0]
+        if any(alternative.lower() in normalized_answer for alternative in alternatives):
+            hits.append(display_name)
+        else:
+            misses.append(display_name)
+
+    return hits, misses, len(keywords) + sum(1 for group in keyword_groups if group.get("anyOf"))
 
 
 def latency_ok(value: Optional[float], max_value: Optional[float]) -> bool:
@@ -447,6 +495,8 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         notes = []
         if item["score"].get("forbiddenHits"):
             notes.append("forbidden hit")
+        if item["score"].get("keywordMisses"):
+            notes.append("keyword misses: " + ", ".join(item["score"]["keywordMisses"][:3]))
         if item.get("semantic", {}).get("enabled"):
             notes.append(f"semantic={item['semantic'].get('score')}")
         if item.get("semantic", {}).get("skipped"):

@@ -32,6 +32,8 @@
 - On model failure, the service MUST emit a `failed` event and save a FAILED assistant message.
 - Business code MUST depend on a gateway abstraction rather than vendor SDK details.
 - Chat prompt assembly SHOULD include enabled RAG context and MCP tool descriptors before invoking the model gateway.
+- The chat stream MUST log key Agent steps with contextual identifiers, including database access, Skill loading, model resolution, RAG retrieval, MCP tool loading, model gateway routing, LLM streaming, and assistant message persistence.
+- Critical Agent steps SHOULD retry transient failures up to 3 attempts by default. If a step still fails after 3 attempts, the backend MUST stop the current stream, persist a FAILED assistant message when possible, and emit a user-readable `failed` SSE event.
 
 ## RAG And MCP
 

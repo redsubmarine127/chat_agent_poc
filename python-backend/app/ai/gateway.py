@@ -27,6 +27,7 @@ class ChatModelGateway:
 
 class LocalFallbackChatModelGateway(ChatModelGateway):
     async def stream(self, model: ModelConfig, messages: list[dict[str, str]]) -> AsyncIterator[ModelChunk]:
+        logger.info("llm_local_stream_started model_id=%s message_count=%s", model.id, len(messages))
         user_message = next((item["content"] for item in reversed(messages) if item["role"] == "user"), "")
         yield ModelChunk("reasoning", "1. 已接收问题，正在整理上下文。\n")
         await asyncio.sleep(0.08)
@@ -43,6 +44,7 @@ class LocalFallbackChatModelGateway(ChatModelGateway):
         for character in answer:
             yield ModelChunk("delta", character)
             await asyncio.sleep(0.01)
+        logger.info("llm_local_stream_completed model_id=%s answer_chars=%s", model.id, len(answer))
 
 
 class OpenAiCompatibleChatModelGateway(ChatModelGateway):
@@ -53,6 +55,13 @@ class OpenAiCompatibleChatModelGateway(ChatModelGateway):
         if not model.api_key:
             raise AssistantError(f"模型 {model.id} 未配置 API Key")
         endpoint = model.base_url.rstrip("/") + "/chat/completions"
+        logger.info(
+            "llm_remote_stream_started model_id=%s provider=%s endpoint=%s message_count=%s",
+            model.id,
+            model.provider,
+            endpoint,
+            len(messages),
+        )
         payload = {
             "model": model.model_name,
             "messages": messages,
@@ -65,6 +74,7 @@ class OpenAiCompatibleChatModelGateway(ChatModelGateway):
         }
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             async with client.stream("POST", endpoint, headers=headers, json=payload) as response:
+                logger.info("llm_remote_response_received model_id=%s status_code=%s", model.id, response.status_code)
                 if response.status_code >= 400:
                     body = await response.aread()
                     logger.warning(
@@ -74,10 +84,13 @@ class OpenAiCompatibleChatModelGateway(ChatModelGateway):
                         body[:500],
                     )
                     raise AssistantError("模型服务调用失败")
+                chunk_count = 0
                 async for line in response.aiter_lines():
                     chunk = self._parse_stream_line(line)
                     if chunk is not None:
+                        chunk_count += 1
                         yield chunk
+                logger.info("llm_remote_stream_completed model_id=%s chunk_count=%s", model.id, chunk_count)
 
     def _parse_stream_line(self, line: str) -> ModelChunk | None:
         if not line.startswith("data:"):
@@ -107,6 +120,13 @@ class RoutingChatModelGateway(ChatModelGateway):
         self._remote = OpenAiCompatibleChatModelGateway()
 
     async def stream(self, model: ModelConfig, messages: list[dict[str, str]]) -> AsyncIterator[ModelChunk]:
+        logger.info(
+            "llm_route_selected model_id=%s provider=%s has_api_key=%s message_count=%s",
+            model.id,
+            model.provider,
+            bool(model.api_key),
+            len(messages),
+        )
         if model.provider == "local":
             async for chunk in self._local.stream(model, messages):
                 yield chunk

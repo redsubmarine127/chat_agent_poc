@@ -29,3 +29,13 @@ class UnsupportedMediaTypeError(AssistantError):
     status_code = 415
     code = "UNSUPPORTED_MEDIA_TYPE"
 
+
+class AgentStepFailedError(AssistantError):
+    status_code = 500
+    code = "AGENT_STEP_FAILED"
+
+    def __init__(self, step_name: str, attempts: int, cause: Exception) -> None:
+        super().__init__(f"{step_name} 连续重试 {attempts} 次仍未成功，已主动停止流程。请检查相关配置或稍后重试。")
+        self.step_name = step_name
+        self.attempts = attempts
+        self.cause = cause

@@ -68,22 +68,22 @@ button {
 .sidebar-header {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 42px 1fr 38px;
-  gap: 12px;
+  grid-template-columns: 36px 1fr 34px;
+  gap: 10px;
   align-items: center;
-  padding: 22px 20px 16px;
+  padding: 18px 18px 14px;
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--color-brand-dark);
   color: #ffffff;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 760;
   letter-spacing: 0;
 }
 
@@ -93,14 +93,16 @@ button {
 
 .brand-copy h1 {
   margin: 0;
-  font-size: 19px;
-  line-height: 1.2;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 760;
   letter-spacing: 0;
 }
 
 .brand-copy span {
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .icon-button,
@@ -154,15 +156,16 @@ textarea:focus-visible {
 
 .new-chat-button {
   flex: 0 0 auto;
-  gap: 8px;
-  height: 44px;
-  margin: 4px 20px 14px;
+  gap: 7px;
+  height: 38px;
+  margin: 2px 18px 12px;
   background: var(--color-brand);
   color: #ffffff;
   border-color: var(--color-brand);
-  border-radius: 12px;
-  font-weight: 800;
-  box-shadow: 0 14px 28px rgba(19, 120, 95, 0.2);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 760;
+  box-shadow: 0 10px 20px rgba(19, 120, 95, 0.16);
 }
 
 .new-chat-button:hover {
@@ -174,9 +177,9 @@ textarea:focus-visible {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   min-height: 0;
-  padding: 0 14px 18px;
+  padding: 0 14px 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -185,9 +188,9 @@ textarea:focus-visible {
 .sidebar-tools {
   flex: 0 0 auto;
   display: grid;
-  gap: 8px;
+  gap: 7px;
   border-top: 1px solid rgba(24, 37, 44, 0.08);
-  padding: 13px 20px 18px;
+  padding: 12px 18px 16px;
   background: rgba(255, 255, 255, 0.74);
 }
 
@@ -195,38 +198,29 @@ textarea:focus-visible {
   position: static;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 2px 3px;
+  padding: 0 2px 2px;
   background: transparent;
   color: #728188;
-  font-size: 12px;
-  font-weight: 850;
-}
-
-.sidebar-tool-label::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-brand);
+  font-size: 11px;
+  font-weight: 760;
 }
 
 .sidebar-tool-button {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto 16px;
+  grid-template-columns: 18px minmax(0, 1fr) auto 14px;
   width: 100%;
   min-width: 0;
-  height: 44px;
+  height: 40px;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   justify-content: stretch;
   border-color: rgba(24, 37, 44, 0.09);
-  border-radius: 13px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.86);
   color: #20353d;
-  font-size: 13px;
-  font-weight: 850;
-  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 760;
+  padding: 0 9px;
   box-shadow: none;
 }
 
@@ -234,8 +228,8 @@ textarea:focus-visible {
   min-width: 0;
   overflow: hidden;
   color: #20353d;
-  font-size: 13px;
-  font-weight: 850;
+  font-size: 12px;
+  font-weight: 760;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -243,8 +237,8 @@ textarea:focus-visible {
 .sidebar-tool-button small {
   margin-left: auto;
   color: #728188;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 680;
   white-space: nowrap;
 }
 
@@ -294,11 +288,11 @@ textarea:focus-visible {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 10px 8px 6px;
+  padding: 8px 8px 6px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.88) 72%, rgba(255, 255, 255, 0) 100%);
   color: #7f8d93;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 760;
 }
 
 .conversation-item {
@@ -422,15 +416,16 @@ textarea:focus-visible {
 .conversation-meta strong {
   overflow: hidden;
   max-width: 48vw;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1.25;
+  font-weight: 760;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .conversation-meta span {
   color: var(--color-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .topbar-actions {
@@ -489,8 +484,8 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 18px 18px 12px;
+  gap: 12px;
+  padding: 16px 18px 10px;
 }
 
 .mobile-history-header div {
@@ -501,15 +496,16 @@ textarea:focus-visible {
 
 .mobile-history-header span {
   color: #728188;
-  font-size: 12px;
-  font-weight: 900;
+  font-size: 11px;
+  font-weight: 760;
   text-transform: uppercase;
 }
 
 .mobile-history-header strong {
   color: #17262d;
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 760;
 }
 
 .mobile-history-header button,
@@ -657,11 +653,11 @@ textarea:focus-visible {
 }
 
 .sidebar-tools .scheduled-session-button {
-  height: 44px;
+  height: 40px;
   background: rgba(255, 255, 255, 0.86);
   color: #20353d;
-  font-size: 13px;
-  font-weight: 850;
+  font-size: 12px;
+  font-weight: 760;
 }
 
 .scheduled-session-button:hover {
@@ -1492,11 +1488,11 @@ textarea:focus-visible {
 
 .sidebar-tools .skill-config-button {
   min-width: 0;
-  height: 44px;
+  height: 40px;
   background: rgba(255, 255, 255, 0.86);
   color: #20353d;
-  font-size: 13px;
-  font-weight: 850;
+  font-size: 12px;
+  font-weight: 760;
 }
 
 .model-control {
@@ -2619,11 +2615,11 @@ textarea::placeholder {
 
   .conversation-meta strong {
     max-width: none;
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .conversation-meta span {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .mobile-topbar-actions {

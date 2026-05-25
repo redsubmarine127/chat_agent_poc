@@ -80,6 +80,8 @@ The default scoring model MUST use a 100 point scale:
 | Stability | 15 |
 | Performance | 10 |
 
+When DeepEval is not enabled, deterministic accuracy scoring SHOULD support both exact keywords and synonym groups. Synonym groups MUST be treated as one expected capability point when any alternative term is present, so semantically valid answers are not failed only because the model used a different wording such as “审计记录” instead of “日志”.
+
 ## Dataset Coverage
 
 Datasets SHOULD cover:

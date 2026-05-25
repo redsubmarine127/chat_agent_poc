@@ -65,7 +65,28 @@
       "skillId": "code-review",
       "expected": {
         "minAnswerChars": 500,
-        "keywords": ["风险", "缓解", "文件上传", "模型", "日志"],
+        "keywordGroups": [
+          {
+            "name": "风险识别",
+            "anyOf": ["风险", "隐患", "问题", "故障点"]
+          },
+          {
+            "name": "缓解措施",
+            "anyOf": ["缓解", "应对措施", "治理措施", "防护措施", "解决方案"]
+          },
+          {
+            "name": "文件上传",
+            "anyOf": ["文件上传", "上传文件", "附件上传", "multipart"]
+          },
+          {
+            "name": "模型调用",
+            "anyOf": ["模型", "大模型", "LLM", "模型服务"]
+          },
+          {
+            "name": "日志审计",
+            "anyOf": ["日志", "审计", "审计记录", "可观测性", "监控"]
+          }
+        ],
         "forbidden": ["一切正常", "没有风险", "Traceback"],
         "requires": {
           "reasoning": true,

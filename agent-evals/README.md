@@ -85,11 +85,11 @@ python3 agent-evals/run_evals.py \
 | 维度 | 分值 | 说明 |
 | --- | ---: | --- |
 | 任务完成 | 40 | 有回答、无 failed、达到最小长度、包含关键内容 |
-| 准确性 | 20 | 关键词命中、禁用词未出现 |
+| 准确性 | 20 | 关键词或同义词组命中、禁用词未出现 |
 | 格式与交互 | 15 | reasoning、表格、代码块、导出能力 |
 | 稳定性 | 15 | SSE 事件完整、无异常、完成事件正常 |
 | 性能 | 10 | 首 token 延迟、总耗时 |
 
-当用例声明 `expected.semantic` 且启用 DeepEval 时，准确性维度会优先使用 DeepEval 的 0-1 语义评分折算为 20 分；否则继续使用关键词和禁用词做确定性评分。
+当用例声明 `expected.semantic` 且启用 DeepEval 时，准确性维度会优先使用 DeepEval 的 0-1 语义评分折算为 20 分；否则继续使用 `keywords` 或 `keywordGroups` 与禁用词做确定性评分。`keywordGroups` 用于表达同义能力点，例如“日志/审计/可观测性”只要命中其中之一即可，避免真实模型换一种说法时被误判。
 
 报告会输出到 `agent-evals/reports/`，包含 JSON 明细和 Markdown 汇总。

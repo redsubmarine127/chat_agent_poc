@@ -1179,6 +1179,8 @@ function closeScheduledHistory() {
 }
 
 function openEvaluationPanel() {
+  evaluationForm.modelId = '';
+  evaluationForm.semanticEvaluator = 'none';
   evaluationPanelOpen.value = true;
 }
 

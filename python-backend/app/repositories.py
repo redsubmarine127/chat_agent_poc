@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -14,6 +15,8 @@ from app.models import (
     SkillResponse,
     utc_now,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def encode_attachment_ids(values: list[UUID]) -> str:
@@ -31,6 +34,7 @@ class ConversationRepository:
         self._database = database
 
     async def list(self) -> list[ConversationResponse]:
+        logger.info("db_conversation_list_query_started")
         query = """
             SELECT id, title, created_at, updated_at
               FROM conversations
@@ -40,7 +44,7 @@ class ConversationRepository:
         """
         async with self._database.acquire() as connection:
             rows = await connection.fetch(query)
-        return [
+        conversations = [
             ConversationResponse(
                 id=row["id"],
                 title=row["title"],
@@ -49,10 +53,13 @@ class ConversationRepository:
             )
             for row in rows
         ]
+        logger.info("db_conversation_list_query_completed count=%s", len(conversations))
+        return conversations
 
     async def create(self, title: str) -> ConversationResponse:
         conversation_id = uuid4()
         now = utc_now()
+        logger.info("db_conversation_create_started conversation_id=%s title_length=%s", conversation_id, len(title.strip()))
         query = """
             INSERT INTO conversations (id, title, deleted, created_at, updated_at)
             VALUES ($1, $2, FALSE, $3, $3)
@@ -60,26 +67,35 @@ class ConversationRepository:
         """
         async with self._database.acquire() as connection:
             row = await connection.fetchrow(query, conversation_id, title.strip(), now)
+        logger.info("db_conversation_create_completed conversation_id=%s", row["id"])
         return ConversationResponse(id=row["id"], title=row["title"], createdAt=row["created_at"], updatedAt=row["updated_at"])
 
     async def ensure_exists(self, conversation_id: UUID) -> None:
+        logger.info("db_conversation_ensure_started conversation_id=%s", conversation_id)
         query = "SELECT 1 FROM conversations WHERE id = $1 AND deleted = FALSE"
         async with self._database.acquire() as connection:
             exists = await connection.fetchval(query, conversation_id)
         if exists is None:
+            logger.warning("db_conversation_ensure_not_found conversation_id=%s", conversation_id)
             raise NotFoundError("对话不存在")
+        logger.info("db_conversation_ensure_completed conversation_id=%s", conversation_id)
 
     async def delete(self, conversation_id: UUID) -> None:
+        logger.info("db_conversation_delete_started conversation_id=%s", conversation_id)
         query = "UPDATE conversations SET deleted = TRUE, updated_at = $2 WHERE id = $1 AND deleted = FALSE"
         async with self._database.acquire() as connection:
             result = await connection.execute(query, conversation_id, utc_now())
         if result == "UPDATE 0":
+            logger.warning("db_conversation_delete_not_found conversation_id=%s", conversation_id)
             raise NotFoundError("对话不存在")
+        logger.info("db_conversation_delete_completed conversation_id=%s result=%s", conversation_id, result)
 
     async def touch(self, conversation_id: UUID) -> None:
+        logger.info("db_conversation_touch_started conversation_id=%s", conversation_id)
         query = "UPDATE conversations SET updated_at = $2 WHERE id = $1 AND deleted = FALSE"
         async with self._database.acquire() as connection:
             await connection.execute(query, conversation_id, utc_now())
+        logger.info("db_conversation_touch_completed conversation_id=%s", conversation_id)
 
 
 class MessageRepository:
@@ -87,6 +103,7 @@ class MessageRepository:
         self._database = database
 
     async def list(self, conversation_id: UUID) -> list[MessageResponse]:
+        logger.info("db_message_list_started conversation_id=%s", conversation_id)
         query = """
             SELECT id, conversation_id, role, content, skill_id, attachment_ids, status, created_at
               FROM chat_messages
@@ -95,7 +112,9 @@ class MessageRepository:
         """
         async with self._database.acquire() as connection:
             rows = await connection.fetch(query, conversation_id)
-        return [self._to_response(row) for row in rows]
+        messages = [self._to_response(row) for row in rows]
+        logger.info("db_message_list_completed conversation_id=%s count=%s", conversation_id, len(messages))
+        return messages
 
     async def save(
         self,
@@ -108,6 +127,16 @@ class MessageRepository:
         message_id: UUID | None = None,
     ) -> MessageResponse:
         created_at = utc_now()
+        effective_message_id = message_id or uuid4()
+        logger.info(
+            "db_message_save_started conversation_id=%s message_id=%s role=%s status=%s content_length=%s attachment_count=%s",
+            conversation_id,
+            effective_message_id,
+            role.value,
+            status.value,
+            len(content),
+            len(attachment_ids),
+        )
         query = """
             INSERT INTO chat_messages
                 (id, conversation_id, role, content, skill_id, attachment_ids, status, created_at)
@@ -117,7 +146,7 @@ class MessageRepository:
         async with self._database.acquire() as connection:
             row = await connection.fetchrow(
                 query,
-                message_id or uuid4(),
+                effective_message_id,
                 conversation_id,
                 role.value,
                 content,
@@ -126,12 +155,16 @@ class MessageRepository:
                 status.value,
                 created_at,
             )
-        return self._to_response(row)
+        message = self._to_response(row)
+        logger.info("db_message_save_completed conversation_id=%s message_id=%s status=%s", conversation_id, message.id, message.status)
+        return message
 
     async def clear(self, conversation_id: UUID) -> None:
+        logger.info("db_message_clear_started conversation_id=%s", conversation_id)
         query = "DELETE FROM chat_messages WHERE conversation_id = $1"
         async with self._database.acquire() as connection:
-            await connection.execute(query, conversation_id)
+            result = await connection.execute(query, conversation_id)
+        logger.info("db_message_clear_completed conversation_id=%s result=%s", conversation_id, result)
 
     def _to_response(self, row) -> MessageResponse:
         return MessageResponse(
@@ -196,4 +229,3 @@ class DynamicSkillRepository:
         async with self._database.acquire() as connection:
             row = await connection.fetchrow(query, skill_id, name, description, utc_now())
         return SkillResponse(id=row["id"], name=row["name"], description=row["description"], enabled=row["enabled"])
-

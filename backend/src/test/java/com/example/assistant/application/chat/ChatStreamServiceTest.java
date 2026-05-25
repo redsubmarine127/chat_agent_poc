@@ -105,19 +105,59 @@ class ChatStreamServiceTest {
     @Test
     void streamShouldEmitFailedEventWhenGatewayFails() {
         UUID conversationId = UUID.randomUUID();
+        AtomicInteger attemptCounter = new AtomicInteger();
         when(conversationService.findConversation(conversationId)).thenReturn(Mono.just(Conversation.create("测试对话")));
         when(skillService.getEnabledSkill("general")).thenReturn(Mono.just(new Skill("general", "通用助手", "通用能力", true)));
         when(modelService.getEnabledModel("local-fallback")).thenReturn(Mono.just(localModel()));
         when(chatMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(Flux.empty());
         when(chatMessageRepository.save(any(ChatMessageEntity.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-        when(chatModelGateway.stream(any(ChatModelGateway.ChatPrompt.class))).thenReturn(Flux.error(new IllegalStateException("boom")));
+        when(chatModelGateway.stream(any(ChatModelGateway.ChatPrompt.class))).thenAnswer(invocation ->
+                Flux.defer(() -> {
+                    attemptCounter.incrementAndGet();
+                    return Flux.error(new IllegalStateException("boom"));
+                }));
 
-        StepVerifier.create(chatStreamService.stream(conversationId, "你好", "general", "local-fallback", List.of()))
-                .expectNextMatches(event -> "started".equals(event.type()))
-                .expectNextMatches(event -> "failed".equals(event.type()) && event.content().contains("对话流生成失败"))
+        StepVerifier.create(chatStreamService.stream(conversationId, "你好", "general", "local-fallback", List.of()).collectList())
+                .assertNext(events -> {
+                    org.assertj.core.api.Assertions.assertThat(attemptCounter.get()).isEqualTo(3);
+                    org.assertj.core.api.Assertions.assertThat(events.getFirst().type()).isEqualTo("started");
+                    org.assertj.core.api.Assertions.assertThat(events.getLast().type()).isEqualTo("failed");
+                    org.assertj.core.api.Assertions.assertThat(events.getLast().content()).contains("连续重试 3 次仍未成功");
+                })
                 .verifyComplete();
 
         verify(chatMessageRepository, times(2)).save(any(ChatMessageEntity.class));
+    }
+
+    @Test
+    void streamShouldRetryGatewayBeforeFirstChunkAndComplete() {
+        UUID conversationId = UUID.randomUUID();
+        AtomicInteger attemptCounter = new AtomicInteger();
+        when(conversationService.findConversation(conversationId)).thenReturn(Mono.just(Conversation.create("测试对话")));
+        when(skillService.getEnabledSkill("general")).thenReturn(Mono.just(new Skill("general", "通用助手", "通用能力", true)));
+        when(modelService.getEnabledModel("local-fallback")).thenReturn(Mono.just(localModel()));
+        when(chatMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId)).thenReturn(Flux.empty());
+        when(chatMessageRepository.save(any(ChatMessageEntity.class))).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+        when(chatModelGateway.stream(any(ChatModelGateway.ChatPrompt.class))).thenAnswer(invocation ->
+                Flux.defer(() -> {
+                    int attempt = attemptCounter.incrementAndGet();
+                    if (attempt < 3) {
+                        return Flux.error(new IllegalStateException("temporary"));
+                    }
+                    return Flux.just(ChatModelGateway.ChatModelChunk.answer("恢复成功"));
+                }));
+
+        StepVerifier.create(chatStreamService.stream(conversationId, "你好", "general", "local-fallback", List.of()).collectList())
+                .assertNext(events -> {
+                    org.assertj.core.api.Assertions.assertThat(attemptCounter.get()).isEqualTo(3);
+                    org.assertj.core.api.Assertions.assertThat(events.getFirst().type()).isEqualTo("started");
+                    org.assertj.core.api.Assertions.assertThat(events)
+                            .anyMatch(event -> "reasoning".equals(event.type()) && event.content().contains("第 2 次尝试"));
+                    org.assertj.core.api.Assertions.assertThat(events)
+                            .anyMatch(event -> "delta".equals(event.type()) && "恢复成功".equals(event.content()));
+                    org.assertj.core.api.Assertions.assertThat(events.getLast().type()).isEqualTo("completed");
+                })
+                .verifyComplete();
     }
 
     @Test

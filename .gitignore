@@ -20,3 +20,4 @@ backend/data/
 python-backend/data/
 python-backend/.env
 python-backend/.venv/
+agent-evals/reports/

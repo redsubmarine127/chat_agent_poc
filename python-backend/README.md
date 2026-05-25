@@ -73,9 +73,11 @@ flowchart TD
     H --> I
     I --> J["保存助手消息"]
     J --> K["SSE: completed"]
-    E -->|"异常"| L["保存 FAILED 助手消息"]
+    E -->|"异常，最多重试 3 次"| L["保存 FAILED 助手消息"]
     L --> M["SSE: failed"]
 ```
+
+关键链路会输出结构化上下文日志，覆盖数据库读写、Skill 加载、模型解析、RAG 检索、MCP 工具加载、LangGraph 编排、LLM 流式调用与助手消息落库。单个关键节点连续 3 次失败后会主动停止当前流，尽量保存 `FAILED` 助手消息，并通过 `failed` SSE 事件给前端返回可读提示。
 
 ## 测试
 

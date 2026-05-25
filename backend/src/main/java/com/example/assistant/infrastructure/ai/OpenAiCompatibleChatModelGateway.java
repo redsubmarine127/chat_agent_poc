@@ -12,14 +12,19 @@ import com.openai.core.http.StreamResponse;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionStreamOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenAiCompatibleChatModelGateway.class);
 
     @Override
     public Flux<ChatModelChunk> stream(ChatPrompt prompt) {
@@ -31,6 +36,16 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
             return Flux.error(new IllegalStateException("模型 %s 未配置 Base URL".formatted(model.name())));
         }
 
+        LOGGER.info(
+                "llm remote stream starting, modelId={}, provider={}, baseUrl={}, modelName={}, historyCount={}, ragContextCount={}, mcpToolCount={}",
+                model.id(),
+                model.provider(),
+                normalizeBaseUrl(model.baseUrl()),
+                model.modelName(),
+                prompt.history().size(),
+                prompt.ragContexts().size(),
+                prompt.mcpTools().size()
+        );
         return Flux.defer(() -> Flux.using(
                 () -> createClientStream(prompt),
                 this::readResponseStream,
@@ -40,6 +55,7 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
 
     private ClientStream createClientStream(ChatPrompt prompt) {
         AiModel model = prompt.model();
+        LOGGER.info("llm remote client stream create started, modelId={}, baseUrl={}", model.id(), normalizeBaseUrl(model.baseUrl()));
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(model.apiKey())
                 .baseUrl(normalizeBaseUrl(model.baseUrl()))
@@ -47,6 +63,7 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         StreamResponse<ChatCompletionChunk> response = client.chat()
                 .completions()
                 .createStreaming(buildRequest(prompt));
+        LOGGER.info("llm remote client stream create completed, modelId={}", model.id());
         return new ClientStream(client, response);
     }
 
@@ -101,6 +118,7 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
     }
 
     private Flux<ChatModelChunk> readResponseStream(ClientStream clientStream) {
+        AtomicInteger chunkCounter = new AtomicInteger();
         return Flux.fromStream(clientStream.response().stream())
                 .flatMapIterable(chunk -> Optional.ofNullable(chunk.choices()).orElse(List.of()))
                 .flatMapIterable(choice -> {
@@ -116,7 +134,9 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
                             .stream()
                             .filter(chunk -> StringUtils.hasText(chunk.content()))
                             .toList();
-                });
+                })
+                .doOnNext(ignored -> chunkCounter.incrementAndGet())
+                .doOnComplete(() -> LOGGER.info("llm remote stream completed, chunkCount={}", chunkCounter.get()));
     }
 
     private String normalizeBaseUrl(String baseUrl) {
@@ -140,6 +160,7 @@ public class OpenAiCompatibleChatModelGateway implements ChatModelGateway {
         public void close() {
             response.close();
             client.close();
+            LOGGER.info("llm remote client stream closed");
         }
     }
 }

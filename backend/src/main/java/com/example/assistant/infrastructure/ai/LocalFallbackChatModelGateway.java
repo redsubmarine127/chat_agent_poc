@@ -1,22 +1,39 @@
 package com.example.assistant.infrastructure.ai;
 
 import com.example.assistant.application.chat.ChatModelGateway;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 
 public class LocalFallbackChatModelGateway implements ChatModelGateway {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LocalFallbackChatModelGateway.class);
+
     @Override
     public Flux<ChatModelChunk> stream(ChatPrompt prompt) {
         String answer = buildAnswer(prompt);
+        LOGGER.info(
+                "llm local stream started, modelId={}, answerChars={}, historyCount={}, ragContextCount={}, mcpToolCount={}",
+                prompt.model().id(),
+                answer.length(),
+                prompt.history().size(),
+                prompt.ragContexts().size(),
+                prompt.mcpTools().size()
+        );
         return Flux.concat(
                 Flux.just(ChatModelChunk.reasoning("""
                         已读取当前 Skill、模型、历史上下文、RAG 检索结果和 MCP 工具清单，准备生成本地回退答复。
                         """)),
                 Flux.fromArray(answer.split("(?<=\\G.{12})")).map(ChatModelChunk::answer)
         )
-                .delayElements(Duration.ofMillis(30));
+                .delayElements(Duration.ofMillis(30))
+                .doOnComplete(() -> LOGGER.info(
+                        "llm local stream completed, modelId={}, answerChars={}",
+                        prompt.model().id(),
+                        answer.length()
+                ));
     }
 
     private String buildAnswer(ChatPrompt prompt) {
